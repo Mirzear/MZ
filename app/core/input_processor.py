@@ -29,6 +29,9 @@ class InputProcessor:
 
             "ask": "preguntar",
             "consultaia": "preguntar",
+
+            "chat": "conversacion",
+            "borrarchat": "borrar_conversacion",
         }
 
         self.valid_commands = {
@@ -40,6 +43,8 @@ class InputProcessor:
             "olvidar",
             "memorias",
             "preguntar",
+            "conversacion",
+            "borrar_conversacion",
         }
 
     def normalize(self, user_input: str) -> str:

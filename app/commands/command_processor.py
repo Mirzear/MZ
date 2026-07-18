@@ -53,6 +53,12 @@ class CommandProcessor:
 
         elif command in {"preguntar", "ask"}:
             self.ask_ai(parts)
+        
+        elif command == "conversacion":
+            self.show_conversation()
+
+        elif command == "borrar_conversacion":
+            self.clear_conversation()
 
         else:
             suggestion = self.mz.input_processor.suggest_command(command)
@@ -144,6 +150,47 @@ class CommandProcessor:
 
         print(f"{self.mz.name}: {response}")
 
+    def show_conversation(self) -> None:
+        messages = self.mz.ai.get_conversation()
+
+        if not messages:
+            print(
+                f"{self.mz.name}: "
+                "No hay mensajes en la conversación."
+            )
+            return
+
+        print(f"{self.mz.name}: Conversación actual:")
+
+        for index, message in enumerate(
+            messages,
+            start=1,
+        ):
+            role = message["role"]
+            content = message["content"]
+
+            role_name = (
+                "Tú"
+                if role == "user"
+                else self.mz.name
+            )
+
+            print(
+                f"{index}. {role_name}: {content}"
+            )
+
+    def clear_conversation(self) -> None:
+        self.mz.ai.clear_conversation()
+
+        self.mz.logger.info(
+            "AI conversation cleared"
+        )
+
+        print(
+            f"{self.mz.name}: "
+            "Conversación eliminada."
+        )
+
     def show_status(self) -> None:
         memories = self.mz.memory.get_all()
         uptime = self.mz.session.get_formatted_uptime()
@@ -187,6 +234,8 @@ class CommandProcessor:
 - recordar <clave> <valor>
 - consultar <clave>
 - preguntar <consulta>
+- conversacion
+- borrar_conversacion
 - olvidar <clave>
 - memorias
 - estado

@@ -155,9 +155,7 @@ class CommandProcessor:
 
 
     def clear_console(self) -> None:
-        import os
-
-        os.system("cls" if os.name == "nt" else "clear")
+        self.mz.system.clear_console()
 
         print(f"{self.mz.name}: Consola limpiada.")
 

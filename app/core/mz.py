@@ -4,6 +4,7 @@ from app.core.memory_manager import MemoryManager
 from app.core.logger import Logger
 from app.core.input_processor import InputProcessor
 from app.core.session_manager import SessionManager
+from app.core.system_manager import SystemManager
 
 class MZ:
 
@@ -13,6 +14,7 @@ class MZ:
         self.input_processor = InputProcessor()
         self.logger = Logger()
         self.memory = MemoryManager()
+        self.system = SystemManager()
 
         self.name = self.config.get("name", "MZ")
         self.version = self.config.get("version", "0.3.0")
@@ -41,6 +43,7 @@ class MZ:
         print("[✔] Procesador de comandos cargado")
         print("[✔] Procesador de entrada cargado")
         print("[✔] Gestor de sesión cargado")
+        print("[✔] Gestor del sistema cargado")
 
         print()
         print(f"Hola {self.user}.")

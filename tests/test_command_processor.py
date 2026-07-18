@@ -4,12 +4,16 @@ from unittest.mock import Mock
 from app.commands.command_processor import (
     CommandProcessor,
 )
+from app.commands.command_registry import (
+    CommandRegistry,
+)
 
 
 class TestCommandProcessor(unittest.TestCase):
 
     def setUp(self) -> None:
         self.mz = Mock()
+        self.registry = CommandRegistry()
 
         self.mz.name = "MZ"
 
@@ -25,18 +29,24 @@ class TestCommandProcessor(unittest.TestCase):
             None
         )
 
-        self.processor = CommandProcessor(self.mz)
+        self.processor = CommandProcessor(
+            mz=self.mz,
+            registry=self.registry,
+        )
 
     def test_known_command_executes_handler(
         self,
     ) -> None:
         handler = Mock()
 
-        self.processor.command_handlers[
-            "prueba"
-        ] = handler
+        self.registry.register(
+            "prueba",
+            handler,
+        )
 
-        self.processor.process("prueba argumento")
+        self.processor.process(
+            "prueba argumento"
+        )
 
         handler.assert_called_once_with(
             [
@@ -48,9 +58,10 @@ class TestCommandProcessor(unittest.TestCase):
     def test_command_is_registered_in_session(
         self,
     ) -> None:
-        self.processor.command_handlers[
-            "prueba"
-        ] = Mock()
+        self.registry.register(
+            "prueba",
+            Mock(),
+        )
 
         self.processor.process("prueba")
 
@@ -71,23 +82,23 @@ class TestCommandProcessor(unittest.TestCase):
             .assert_not_called()
         )
 
-    def test_command_handlers_contains_expected_commands(
+    def test_default_commands_are_registered(
         self,
     ) -> None:
-        self.assertIn(
-            "hola",
-            self.processor.command_handlers,
+        self.assertTrue(
+            self.registry.exists("hola")
         )
 
-        self.assertIn(
-            "preguntar",
-            self.processor.command_handlers,
+        self.assertTrue(
+            self.registry.exists("preguntar")
         )
 
-        self.assertIn(
-            "conversacion",
-            self.processor.command_handlers,
+        self.assertTrue(
+            self.registry.exists(
+                "conversacion"
+            )
         )
+
 
 if __name__ == "__main__":
     unittest.main()

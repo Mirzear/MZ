@@ -1,32 +1,53 @@
-from app.commands.command_processor import CommandProcessor
-from app.core.config_manager import ConfigManager
-from app.core.memory_manager import MemoryManager
-from app.core.logger import Logger
-from app.core.input_processor import InputProcessor
-from app.core.session_manager import SessionManager
-from app.core.system_manager import SystemManager
 from app.ai.ai_service import AIService
 from app.ai.mock_ai_provider import MockAIProvider
+from app.commands.command_processor import CommandProcessor
+from app.commands.command_registry import CommandRegistry
+from app.core.config_manager import ConfigManager
+from app.core.input_processor import InputProcessor
+from app.core.logger import Logger
+from app.core.memory_manager import MemoryManager
+from app.core.session_manager import SessionManager
+from app.core.system_manager import SystemManager
+
 
 class MZ:
 
     def __init__(self) -> None:
         self.config = ConfigManager()
         self.session = SessionManager()
-        self.input_processor = InputProcessor()
         self.logger = Logger()
         self.memory = MemoryManager()
         self.system = SystemManager()
+
         self.ai = AIService(
             provider=MockAIProvider()
         )
 
-        self.name = self.config.get("name", "MZ")
-        self.version = self.config.get("version", "0.3.0")
-        self.user = self.config.get("user", "Usuario")
+        self.command_registry = CommandRegistry()
+
+        self.input_processor = InputProcessor(
+            registry=self.command_registry,
+        )
+
+        self.command_processor = CommandProcessor(
+            mz=self,
+            registry=self.command_registry,
+        )
+
+        self.name = self.config.get(
+            "name",
+            "MZ",
+        )
+        self.version = self.config.get(
+            "version",
+            "0.3.0",
+        )
+        self.user = self.config.get(
+            "user",
+            "Usuario",
+        )
 
         self.running = False
-        self.command_processor = CommandProcessor(self)
 
     def start(self) -> None:
         self.running = True
@@ -54,7 +75,10 @@ class MZ:
         print()
         print(f"Hola {self.user}.")
         print(f"{self.name} está operativo.")
-        print("Escribí 'ayuda' para ver los comandos disponibles.")
+        print(
+            "Escribí 'ayuda' para ver los "
+            "comandos disponibles."
+        )
         print("=" * 50)
 
     def run_conversation_loop(self) -> None:
@@ -64,9 +88,14 @@ class MZ:
             if not user_input:
                 continue
 
-            self.command_processor.process(user_input)
+            self.command_processor.process(
+                user_input
+            )
 
     def stop(self) -> None:
-        print(f"{self.name}: Hasta luego, {self.user}.")
+        print(
+            f"{self.name}: "
+            f"Hasta luego, {self.user}."
+        )
         self.logger.info("MZ stopped")
         self.running = False

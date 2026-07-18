@@ -1,9 +1,16 @@
 from difflib import get_close_matches
 
+from app.commands.command_registry import CommandRegistry
+
 
 class InputProcessor:
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        registry: CommandRegistry,
+    ) -> None:
+        self.registry = registry
+
         self.command_aliases = {
             "recordá": "recordar",
             "recuerda": "recordar",
@@ -34,46 +41,56 @@ class InputProcessor:
             "borrarchat": "borrar_conversacion",
         }
 
-        self.valid_commands = {
-            "hola",
-            "ayuda",
-            "salir",
-            "recordar",
-            "consultar",
-            "olvidar",
-            "memorias",
-            "preguntar",
-            "conversacion",
-            "borrar_conversacion",
-        }
-
     def normalize(self, user_input: str) -> str:
         """Normalize raw user input."""
-        return " ".join(user_input.strip().split())
+        return " ".join(
+            user_input.strip().split()
+        )
 
-    def split(self, user_input: str) -> list[str]:
+    def split(
+        self,
+        user_input: str,
+    ) -> list[str]:
         """Split normalized input into command, key and value."""
-        normalized_input = self.normalize(user_input)
+        normalized_input = self.normalize(
+            user_input
+        )
 
         if not normalized_input:
             return []
 
-        return normalized_input.split(maxsplit=2)
+        return normalized_input.split(
+            maxsplit=2
+        )
 
-    def get_command(self, parts: list[str]) -> str:
+    def get_command(
+        self,
+        parts: list[str],
+    ) -> str:
         """Return the normalized command."""
         if not parts:
             return ""
 
         raw_command = parts[0].lower()
 
-        return self.command_aliases.get(raw_command, raw_command)
+        return self.command_aliases.get(
+            raw_command,
+            raw_command,
+        )
 
-    def suggest_command(self, command: str) -> str | None:
-        """Suggest the closest valid command."""
+    def suggest_command(
+        self,
+        command: str,
+    ) -> str | None:
+        """Suggest the closest registered command."""
+        possible_commands = (
+            self.registry.get_commands()
+            | set(self.command_aliases)
+        )
+
         matches = get_close_matches(
             command,
-            self.valid_commands,
+            possible_commands,
             n=1,
             cutoff=0.7,
         )
@@ -81,4 +98,9 @@ class InputProcessor:
         if not matches:
             return None
 
-        return matches[0]
+        suggestion = matches[0]
+
+        return self.command_aliases.get(
+            suggestion,
+            suggestion,
+        )

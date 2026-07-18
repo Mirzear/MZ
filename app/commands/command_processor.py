@@ -1,5 +1,8 @@
-from collections.abc import Callable
+from app.commands.command_registry import CommandRegistry
 from typing import TYPE_CHECKING
+from app.commands.command_registry import (
+    CommandRegistry,
+)
 
 if TYPE_CHECKING:
     from app.core.mz import MZ
@@ -7,27 +10,69 @@ if TYPE_CHECKING:
 
 class CommandProcessor:
 
-    def __init__(self, mz) -> None:
+    def __init__(
+        self,
+        mz: "MZ",
+        registry: CommandRegistry,
+    ) -> None:
         self.mz = mz
+        self.registry = registry
 
-        self.command_handlers: dict[
-            str,
-            Callable[[list[str]], None],
-        ] = {
-            "hola": self.greet,
-            "ayuda": self.show_help,
-            "salir": self.exit_program,
-            "recordar": self.remember,
-            "consultar": self.recall,
-            "olvidar": self.forget,
-            "memorias": self.show_memories,
-            "preguntar": self.ask_ai,
-            "estado": self.show_status,
-            "historial": self.show_history,
-            "limpiar": self.clear_console,
-            "conversacion": self.show_conversation,
-            "borrar_conversacion": self.clear_conversation,
-        }
+        self._register_commands()
+
+    def _register_commands(self) -> None:
+        self.registry.register(
+            "hola",
+            self.greet,
+        )
+        self.registry.register(
+            "ayuda",
+            self.show_help,
+        )
+        self.registry.register(
+            "salir",
+            self.exit_program,
+        )
+        self.registry.register(
+            "recordar",
+            self.remember,
+        )
+        self.registry.register(
+            "consultar",
+            self.recall,
+        )
+        self.registry.register(
+            "olvidar",
+            self.forget,
+        )
+        self.registry.register(
+            "memorias",
+            self.show_memories,
+        )
+        self.registry.register(
+            "preguntar",
+            self.ask_ai,
+        )
+        self.registry.register(
+            "estado",
+            self.show_status,
+        )
+        self.registry.register(
+            "historial",
+            self.show_history,
+        )
+        self.registry.register(
+            "limpiar",
+            self.clear_console,
+        )
+        self.registry.register(
+            "conversacion",
+            self.show_conversation,
+        )
+        self.registry.register(
+            "borrar_conversacion",
+            self.clear_conversation,
+        )
 
     def process(self, user_input: str) -> None:
         parts = self.mz.input_processor.split(user_input)
@@ -35,11 +80,13 @@ class CommandProcessor:
         if not parts:
             return
 
-        command = self.mz.input_processor.get_command(parts)
+        command = self.mz.input_processor.get_command(
+            parts
+        )
 
         self.mz.session.register_command(command)
 
-        handler = self.command_handlers.get(command)
+        handler = self.registry.get(command)
 
         if handler is not None:
             handler(parts)

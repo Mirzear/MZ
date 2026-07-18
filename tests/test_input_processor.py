@@ -1,65 +1,143 @@
 import unittest
 
+from app.commands.command_registry import (
+    CommandRegistry,
+)
 from app.core.input_processor import InputProcessor
 
 
 class TestInputProcessor(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.processor = InputProcessor()
+        self.registry = CommandRegistry()
 
-    def test_normalize_removes_extra_spaces(self) -> None:
+        self.registry.register(
+            "hola",
+            lambda _parts: None,
+        )
+        self.registry.register(
+            "ayuda",
+            lambda _parts: None,
+        )
+        self.registry.register(
+            "salir",
+            lambda _parts: None,
+        )
+        self.registry.register(
+            "recordar",
+            lambda _parts: None,
+        )
+        self.registry.register(
+            "consultar",
+            lambda _parts: None,
+        )
+        self.registry.register(
+            "olvidar",
+            lambda _parts: None,
+        )
+        self.registry.register(
+            "memorias",
+            lambda _parts: None,
+        )
+        self.registry.register(
+            "preguntar",
+            lambda _parts: None,
+        )
+        self.registry.register(
+            "conversacion",
+            lambda _parts: None,
+        )
+        self.registry.register(
+            "borrar_conversacion",
+            lambda _parts: None,
+        )
+
+        self.processor = InputProcessor(
+            registry=self.registry,
+        )
+
+    def test_normalize_removes_extra_spaces(
+        self,
+    ) -> None:
         result = self.processor.normalize(
-            "   recordar     ciudad     Buenos Aires   "
+            "   recordar    lenguaje    Python   "
         )
 
         self.assertEqual(
             result,
-            "recordar ciudad Buenos Aires",
+            "recordar lenguaje Python",
         )
 
-    def test_split_preserves_value_spaces(self) -> None:
+    def test_split_preserves_value_spaces(
+        self,
+    ) -> None:
         result = self.processor.split(
-            "recordar comida milanesa con puré"
+            "recordar lenguaje Python es dinámico"
         )
 
         self.assertEqual(
             result,
             [
                 "recordar",
-                "comida",
-                "milanesa con puré",
+                "lenguaje",
+                "Python es dinámico",
             ],
         )
 
-    def test_alias_is_converted_to_official_command(self) -> None:
-        parts = self.processor.split("guardar color azul")
-        command = self.processor.get_command(parts)
+    def test_empty_input_returns_empty_command(
+        self,
+    ) -> None:
+        result = self.processor.get_command([])
 
-        self.assertEqual(command, "recordar")
+        self.assertEqual(
+            result,
+            "",
+        )
 
-    def test_command_is_converted_to_lowercase(self) -> None:
-        parts = self.processor.split("CONSULTAR ciudad")
-        command = self.processor.get_command(parts)
+    def test_command_is_converted_to_lowercase(
+        self,
+    ) -> None:
+        result = self.processor.get_command(
+            ["HOLA"]
+        )
 
-        self.assertEqual(command, "consultar")
+        self.assertEqual(
+            result,
+            "hola",
+        )
 
-    def test_empty_input_returns_empty_command(self) -> None:
-        parts = self.processor.split("      ")
-        command = self.processor.get_command(parts)
+    def test_alias_is_converted_to_official_command(
+        self,
+    ) -> None:
+        result = self.processor.get_command(
+            ["guardar"]
+        )
 
-        self.assertEqual(parts, [])
-        self.assertEqual(command, "")
+        self.assertEqual(
+            result,
+            "recordar",
+        )
 
-    def test_suggests_similar_command(self) -> None:
-        suggestion = self.processor.suggest_command("colsultar")
+    def test_suggests_similar_command(
+        self,
+    ) -> None:
+        result = self.processor.suggest_command(
+            "colsultar"
+        )
 
-        self.assertEqual(suggestion, "consultar")
+        self.assertEqual(
+            result,
+            "consultar",
+        )
 
-    def test_unrelated_word_has_no_suggestion(self) -> None:
-        suggestion = self.processor.suggest_command("banana")
+    def test_unrelated_word_has_no_suggestion(
+        self,
+    ) -> None:
+        result = self.processor.suggest_command(
+            "xyzabc"
+        )
 
-        self.assertIsNone(suggestion)
+        self.assertIsNone(result)
 
 
 if __name__ == "__main__":

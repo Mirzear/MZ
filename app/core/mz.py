@@ -1,12 +1,13 @@
 from app.commands.command_processor import CommandProcessor
 from app.core.config_manager import ConfigManager
 from app.core.memory_manager import MemoryManager
-
+from app.core.logger import Logger
 
 class MZ:
 
     def __init__(self) -> None:
         self.config = ConfigManager()
+        self.logger = Logger()
         self.memory = MemoryManager()
 
         self.name = self.config.get("name", "MZ")
@@ -18,6 +19,8 @@ class MZ:
 
     def start(self) -> None:
         self.running = True
+
+        self.logger.info("MZ started")
 
         self.show_startup_message()
         self.run_conversation_loop()
@@ -50,4 +53,5 @@ class MZ:
 
     def stop(self) -> None:
         print(f"{self.name}: Hasta luego, {self.user}.")
+        self.logger.info("MZ stopped")
         self.running = False

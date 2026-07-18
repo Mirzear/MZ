@@ -13,6 +13,8 @@ class CommandProcessor:
         parts = user_input.strip().split(maxsplit=2)
         command = parts[0].lower()
 
+        self.mz.logger.info(f"Command received: {command}")
+
         if command in {"salir", "exit", "cerrar"}:
             self.mz.stop()
 
@@ -35,6 +37,7 @@ class CommandProcessor:
             self.show_memories()
 
         else:
+            self.mz.logger.warning(f"Unknown command: {user_input}")
             print(f"{self.mz.name}: Todavía no entiendo ese comando.")
 
     def remember(self, parts: list[str]) -> None:

@@ -1,6 +1,5 @@
-import os
+from collections.abc import Callable
 from typing import TYPE_CHECKING
-from urllib import response
 
 if TYPE_CHECKING:
     from app.core.mz import MZ
@@ -8,72 +7,63 @@ if TYPE_CHECKING:
 
 class CommandProcessor:
 
-    def __init__(self, mz: "MZ") -> None:
+    def __init__(self, mz) -> None:
         self.mz = mz
+
+        self.command_handlers: dict[
+            str,
+            Callable[[list[str]], None],
+        ] = {
+            "hola": self.greet,
+            "ayuda": self.show_help,
+            "salir": self.exit_program,
+            "recordar": self.remember,
+            "consultar": self.recall,
+            "olvidar": self.forget,
+            "memorias": self.show_memories,
+            "preguntar": self.ask_ai,
+            "estado": self.show_status,
+            "historial": self.show_history,
+            "limpiar": self.clear_console,
+            "conversacion": self.show_conversation,
+            "borrar_conversacion": self.clear_conversation,
+        }
 
     def process(self, user_input: str) -> None:
         parts = self.mz.input_processor.split(user_input)
-        command = self.mz.input_processor.get_command(parts)
-        
-        if not command:
+
+        if not parts:
             return
 
-        self.mz.logger.info(f"Command received: {command}")
+        command = self.mz.input_processor.get_command(parts)
+
         self.mz.session.register_command(command)
 
-        if command in {"salir", "exit", "cerrar"}:
-            self.mz.stop()
+        handler = self.command_handlers.get(command)
 
-        elif command in {"hola", "buenas", "hello"}:
-            print(f"{self.mz.name}: Hola {self.mz.user}.")
+        if handler is not None:
+            handler(parts)
+            return
 
-        elif command in {"ayuda", "help"}:
-            self.show_help()
+        suggestion = (
+            self.mz.input_processor.suggest_command(
+                command
+            )
+        )
 
-        elif command == "recordar":
-            self.remember(parts)
+        if suggestion:
+            print(
+                f"{self.mz.name}: "
+                f"Comando desconocido: '{command}'. "
+                f"¿Quisiste decir '{suggestion}'?"
+            )
+            return
 
-        elif command == "consultar":
-            self.recall(parts)
-
-        elif command == "olvidar":
-            self.forget(parts)
-
-        elif command == "memorias":
-            self.show_memories()
-        
-        elif command in {"estado", "status"}:
-            self.show_status()
-
-        elif command in {"historial", "history"}:
-            self.show_history()
-
-        elif command in {"limpiar", "clear"}:
-            self.clear_console()
-
-        elif command in {"preguntar", "ask"}:
-            self.ask_ai(parts)
-        
-        elif command == "conversacion":
-            self.show_conversation()
-
-        elif command == "borrar_conversacion":
-            self.clear_conversation()
-
-        else:
-            suggestion = self.mz.input_processor.suggest_command(command)
-
-            self.mz.logger.warning(f"Unknown command: {user_input}")
-
-            if suggestion:
-                print(
-                    f"{self.mz.name}: Comando desconocido: '{command}'. "
-                    f"Quizás quisiste decir '{suggestion}'."
-                )
-                
-            else:
-                print(f"{self.mz.name}: Todavía no entiendo ese comando.")
-
+        print(
+            f"{self.mz.name}: "
+            f"Comando desconocido: '{command}'. "
+            "Escribí 'ayuda' para ver los comandos."
+        )
 
     def remember(self, parts: list[str]) -> None:
         if len(parts) < 3:
@@ -89,6 +79,14 @@ class CommandProcessor:
         self.mz.memory.remember(key, value)
 
         print(f"{self.mz.name}: Recordaré que {key} = {value}.")
+    
+    def greet(self, _parts: list[str]) -> None:
+        print(f"{self.mz.name}: Hola, {self.mz.user}.")
+
+
+    def exit_program(self, _parts: list[str]) -> None:
+        print(f"{self.mz.name}: Hasta luego, {self.mz.user}.")
+        self.mz.running = False
 
     def recall(self, parts: list[str]) -> None:
         if len(parts) < 2:
@@ -123,7 +121,7 @@ class CommandProcessor:
         else:
             print(f"{self.mz.name}: No tenía ningún dato guardado como '{key}'.")
 
-    def show_memories(self) -> None:
+    def show_memories(self, _parts: list[str]) -> None:
         memories = self.mz.memory.get_all()
 
         if not memories:
@@ -138,8 +136,8 @@ class CommandProcessor:
     def ask_ai(self, parts: list[str]) -> None:
         if len(parts) < 2:
             print(
-            f"{self.mz.name}: Uso correcto: "
-            "preguntar <consulta>"
+                  f"{self.mz.name}: Uso correcto: "
+                 "preguntar <consulta>"
              )
             return
 
@@ -150,7 +148,7 @@ class CommandProcessor:
 
         print(f"{self.mz.name}: {response}")
 
-    def show_conversation(self) -> None:
+    def show_conversation(self, _parts: list[str]) -> None:
         messages = self.mz.ai.get_conversation()
 
         if not messages:
@@ -179,7 +177,7 @@ class CommandProcessor:
                 f"{index}. {role_name}: {content}"
             )
 
-    def clear_conversation(self) -> None:
+    def clear_conversation(self, _parts: list[str]) -> None:
         self.mz.ai.clear_conversation()
 
         self.mz.logger.info(
@@ -191,7 +189,7 @@ class CommandProcessor:
             "Conversación eliminada."
         )
 
-    def show_status(self) -> None:
+    def show_status(self, _parts: list[str]) -> None:
         memories = self.mz.memory.get_all()
         uptime = self.mz.session.get_formatted_uptime()
 
@@ -207,7 +205,7 @@ class CommandProcessor:
         """)
 
 
-    def show_history(self) -> None:
+    def show_history(self, _parts: list[str]) -> None:
         history = self.mz.session.get_history()
 
         if not history:
@@ -216,16 +214,19 @@ class CommandProcessor:
 
         print(f"{self.mz.name}: Historial de la sesión:")
 
-        for position, command in enumerate(history, start=1):
-          print(f"{position}. {command}")
+        for position, command in enumerate(
+            history, 
+            start=1
+        ):
+            print(f"{position}. {command}")
 
 
-    def clear_console(self) -> None:
+    def clear_console(self, _parts: list[str]) -> None:
         self.mz.system.clear_console()
 
         print(f"{self.mz.name}: Consola limpiada.")
 
-    def show_help(self) -> None:
+    def show_help(self, _parts: list[str]) -> None:
          print(
         f"""
 {self.mz.name}: Comandos disponibles:

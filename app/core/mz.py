@@ -2,11 +2,13 @@ from app.commands.command_processor import CommandProcessor
 from app.core.config_manager import ConfigManager
 from app.core.memory_manager import MemoryManager
 from app.core.logger import Logger
+from app.core.input_processor import InputProcessor
 
 class MZ:
 
     def __init__(self) -> None:
         self.config = ConfigManager()
+        self.input_processor = InputProcessor()
         self.logger = Logger()
         self.memory = MemoryManager()
 
@@ -35,6 +37,7 @@ class MZ:
         print("[✔] Configuración cargada")
         print("[✔] Memoria cargada")
         print("[✔] Procesador de comandos cargado")
+        print("[✔] Procesador de entrada cargado")
 
         print()
         print(f"Hola {self.user}.")

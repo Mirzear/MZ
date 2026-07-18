@@ -10,8 +10,11 @@ class CommandProcessor:
         self.mz = mz
 
     def process(self, user_input: str) -> None:
-        parts = user_input.strip().split(maxsplit=2)
-        command = parts[0].lower()
+        parts = self.mz.input_processor.split(user_input)
+        command = self.mz.input_processor.get_command(parts)
+        
+        if not command:
+            return
 
         self.mz.logger.info(f"Command received: {command}")
 

@@ -1,3 +1,4 @@
+from app.commands.command_processor import CommandProcessor
 from app.core.config_manager import ConfigManager
 from app.core.memory_manager import MemoryManager
 
@@ -13,6 +14,7 @@ class MZ:
         self.user = self.config.get("user", "Usuario")
 
         self.running = False
+        self.command_processor = CommandProcessor(self)
 
     def start(self) -> None:
         self.running = True
@@ -29,6 +31,7 @@ class MZ:
         print("[✔] Núcleo cargado")
         print("[✔] Configuración cargada")
         print("[✔] Memoria cargada")
+        print("[✔] Procesador de comandos cargado")
 
         print()
         print(f"Hola {self.user}.")
@@ -43,28 +46,7 @@ class MZ:
             if not user_input:
                 continue
 
-            self.process_input(user_input)
-
-    def process_input(self, user_input: str) -> None:
-        command = user_input.lower()
-
-        if command in {"salir", "exit", "cerrar"}:
-            self.stop()
-        elif command in {"hola", "buenas", "hello"}:
-            print(f"{self.name}: Hola {self.user}.")
-        elif command in {"ayuda", "help"}:
-            self.show_help()
-        else:
-            print(f"{self.name}: Todavía no entiendo ese comando.")
-
-    def show_help(self) -> None:
-        print(f"""
-{self.name}: Comandos disponibles:
-
-- hola
-- ayuda
-- salir
-""")
+            self.command_processor.process(user_input)
 
     def stop(self) -> None:
         print(f"{self.name}: Hasta luego, {self.user}.")

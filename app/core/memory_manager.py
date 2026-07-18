@@ -4,9 +4,13 @@ from typing import Any
 
 
 class MemoryManager:
-    def __init__(self) -> None:
+    def __init__(self, path: Path | None = None) -> None:
         self.base_path = Path(__file__).resolve().parents[2]
-        self.path = self.base_path / "data" / "memory.json"
+        
+        self.path = path or (
+            self.base_path / "data" / "memory.json"
+        )
+
         self.data: dict[str, Any] = {}
 
         self.load()

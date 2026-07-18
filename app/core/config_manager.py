@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-
+from typing import Any
 
 class ConfigManager:
 
@@ -19,5 +19,5 @@ class ConfigManager:
         return {}
 
 
-    def get(self, key):
+    def get(self, key: str, default: Any = None) -> Any:
         return self.datos.get(key)

@@ -40,8 +40,19 @@ class CommandProcessor:
             self.show_memories()
 
         else:
+            suggestion = self.mz.input_processor.suggest_command(command)
+
             self.mz.logger.warning(f"Unknown command: {user_input}")
-            print(f"{self.mz.name}: Todavía no entiendo ese comando.")
+
+            if suggestion:
+                print(
+                    f"{self.mz.name}: Comando desconocido: '{command}'. "
+                    f"Quizás quisiste decir '{suggestion}'."
+                )
+                
+            else:
+                print(f"{self.mz.name}: Todavía no entiendo ese comando.")
+
 
     def remember(self, parts: list[str]) -> None:
         if len(parts) < 3:

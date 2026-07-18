@@ -1,4 +1,42 @@
+from difflib import get_close_matches
+
+
 class InputProcessor:
+
+    def __init__(self) -> None:
+        self.command_aliases = {
+            "recordá": "recordar",
+            "recuerda": "recordar",
+            "guardar": "recordar",
+            "acordate": "recordar",
+
+            "consulta": "consultar",
+            "buscar": "consultar",
+            "ver": "consultar",
+
+            "borrar": "olvidar",
+            "eliminar": "olvidar",
+
+            "recuerdos": "memorias",
+
+            "adios": "salir",
+            "adiós": "salir",
+            "chau": "salir",
+
+            "help": "ayuda",
+            "hello": "hola",
+            "exit": "salir",
+        }
+
+        self.valid_commands = {
+            "hola",
+            "ayuda",
+            "salir",
+            "recordar",
+            "consultar",
+            "olvidar",
+            "memorias",
+        }
 
     def normalize(self, user_input: str) -> str:
         """Normalize raw user input."""
@@ -14,8 +52,24 @@ class InputProcessor:
         return normalized_input.split(maxsplit=2)
 
     def get_command(self, parts: list[str]) -> str:
-        """Return the command in lowercase."""
+        """Return the normalized command."""
         if not parts:
             return ""
 
-        return parts[0].lower()
+        raw_command = parts[0].lower()
+
+        return self.command_aliases.get(raw_command, raw_command)
+
+    def suggest_command(self, command: str) -> str | None:
+        """Suggest the closest valid command."""
+        matches = get_close_matches(
+            command,
+            self.valid_commands,
+            n=1,
+            cutoff=0.7,
+        )
+
+        if not matches:
+            return None
+
+        return matches[0]

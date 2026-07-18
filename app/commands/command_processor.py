@@ -1,5 +1,6 @@
 import os
 from typing import TYPE_CHECKING
+from urllib import response
 
 if TYPE_CHECKING:
     from app.core.mz import MZ
@@ -49,6 +50,9 @@ class CommandProcessor:
 
         elif command in {"limpiar", "clear"}:
             self.clear_console()
+
+        elif command in {"preguntar", "ask"}:
+            self.ask_ai(parts)
 
         else:
             suggestion = self.mz.input_processor.suggest_command(command)
@@ -125,6 +129,21 @@ class CommandProcessor:
         for key, value in memories.items():
             print(f"- {key}: {value}")
 
+    def ask_ai(self, parts: list[str]) -> None:
+        if len(parts) < 2:
+            print(
+            f"{self.mz.name}: Uso correcto: "
+            "preguntar <consulta>"
+             )
+            return
+
+        prompt = " ".join(parts[1:])
+        response = self.mz.ai.ask(prompt)
+
+        self.mz.logger.info("AI response generated")
+
+        print(f"{self.mz.name}: {response}")
+
     def show_status(self) -> None:
         memories = self.mz.memory.get_all()
         uptime = self.mz.session.get_formatted_uptime()
@@ -167,6 +186,7 @@ class CommandProcessor:
 - hola
 - recordar <clave> <valor>
 - consultar <clave>
+- preguntar <consulta>
 - olvidar <clave>
 - memorias
 - estado

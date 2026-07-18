@@ -1,3 +1,4 @@
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -17,6 +18,7 @@ class CommandProcessor:
             return
 
         self.mz.logger.info(f"Command received: {command}")
+        self.mz.session.register_command(command)
 
         if command in {"salir", "exit", "cerrar"}:
             self.mz.stop()
@@ -38,6 +40,15 @@ class CommandProcessor:
 
         elif command == "memorias":
             self.show_memories()
+        
+        elif command in {"estado", "status"}:
+            self.show_status()
+
+        elif command in {"historial", "history"}:
+            self.show_history()
+
+        elif command in {"limpiar", "clear"}:
+            self.clear_console()
 
         else:
             suggestion = self.mz.input_processor.suggest_command(command)
@@ -114,9 +125,45 @@ class CommandProcessor:
         for key, value in memories.items():
             print(f"- {key}: {value}")
 
+    def show_status(self) -> None:
+        memories = self.mz.memory.get_all()
+        uptime = self.mz.session.get_formatted_uptime()
+
+        print(f"""
+        {self.mz.name}: Estado del sistema
+
+        - Nombre: {self.mz.name}
+        - Versión: {self.mz.version}
+        - Usuario: {self.mz.user}
+        - Tiempo activo: {uptime}
+        - Recuerdos guardados: {len(memories)}
+        - Comandos ejecutados: {len(self.mz.session.get_history())}
+        """)
+
+
+    def show_history(self) -> None:
+        history = self.mz.session.get_history()
+
+        if not history:
+            print(f"{self.mz.name}: El historial de esta sesión está vacío.")
+            return
+
+        print(f"{self.mz.name}: Historial de la sesión:")
+
+        for position, command in enumerate(history, start=1):
+          print(f"{position}. {command}")
+
+
+    def clear_console(self) -> None:
+        import os
+
+        os.system("cls" if os.name == "nt" else "clear")
+
+        print(f"{self.mz.name}: Consola limpiada.")
+
     def show_help(self) -> None:
-        print(
-            f"""
+         print(
+        f"""
 {self.mz.name}: Comandos disponibles:
 
 - hola
@@ -124,7 +171,10 @@ class CommandProcessor:
 - consultar <clave>
 - olvidar <clave>
 - memorias
+- estado
+- historial
+- limpiar
 - ayuda
 - salir
 """
-        )
+    )

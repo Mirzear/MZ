@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 from app.tools.tool_call import ToolCall
 
@@ -16,6 +17,7 @@ class AIResponse:
     content: str | None = None
     tool_call: ToolCall | None = None
     error_message: str | None = None
+    provider_state: Any = None
 
     def __post_init__(self) -> None:
         if not isinstance(
@@ -88,13 +90,11 @@ class AIResponse:
 
     def _validate_payload(
         self,
+        *,
         content: str | None,
         error_message: str | None,
     ) -> None:
-        if (
-            self.response_type
-            is AIResponseType.TEXT
-        ):
+        if self.response_type is AIResponseType.TEXT:
             if not content:
                 raise ValueError(
                     "Una respuesta de texto debe "
@@ -111,6 +111,12 @@ class AIResponse:
                 raise ValueError(
                     "Una respuesta de texto no puede "
                     "contener un mensaje de error."
+                )
+
+            if self.provider_state is not None:
+                raise ValueError(
+                    "Una respuesta de texto no puede "
+                    "contener estado del proveedor."
                 )
 
             return
@@ -140,10 +146,7 @@ class AIResponse:
 
             return
 
-        if (
-            self.response_type
-            is AIResponseType.ERROR
-        ):
+        if self.response_type is AIResponseType.ERROR:
             if not error_message:
                 raise ValueError(
                     "Una respuesta de error debe "
@@ -162,6 +165,12 @@ class AIResponse:
                     "contener un ToolCall."
                 )
 
+            if self.provider_state is not None:
+                raise ValueError(
+                    "Una respuesta de error no puede "
+                    "contener estado del proveedor."
+                )
+
     @classmethod
     def from_text(
         cls,
@@ -176,12 +185,15 @@ class AIResponse:
     def from_tool_call(
         cls,
         tool_call: ToolCall,
+        *,
+        provider_state: Any = None,
     ) -> "AIResponse":
         return cls(
             response_type=(
                 AIResponseType.TOOL_CALL
             ),
             tool_call=tool_call,
+            provider_state=provider_state,
         )
 
     @classmethod

@@ -223,6 +223,62 @@ class TestAIResponse(unittest.TestCase):
                 content="Hola",
                 error_message="Error",
             )
+    def test_tool_call_accepts_provider_state(
+        self,
+    ) -> None:
+        provider_state = object()
+
+        response = AIResponse.from_tool_call(
+            ToolCall(
+                tool_name="count_words",
+                arguments={
+                    "text": "Hola mundo",
+                },
+            ),
+            provider_state=provider_state,
+        )
+
+        self.assertIs(
+            response.provider_state,
+            provider_state,
+        )
+
+
+    def test_tool_call_accepts_missing_provider_state(
+        self,
+    ) -> None:
+        response = AIResponse.from_tool_call(
+            ToolCall(
+                tool_name="count_words",
+                arguments={},
+            )
+        )
+
+        self.assertIsNone(
+            response.provider_state
+        )
+
+
+    def test_text_response_rejects_provider_state(
+        self,
+    ) -> None:
+        with self.assertRaises(ValueError):
+            AIResponse(
+                response_type=AIResponseType.TEXT,
+                content="Respuesta",
+                provider_state=object(),
+            )
+
+
+    def test_error_response_rejects_provider_state(
+        self,
+    ) -> None:
+        with self.assertRaises(ValueError):
+            AIResponse(
+                response_type=AIResponseType.ERROR,
+                error_message="Error",
+                provider_state=object(),
+            )
 
 
 if __name__ == "__main__":

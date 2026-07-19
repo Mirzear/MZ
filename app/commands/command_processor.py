@@ -2,9 +2,11 @@ from typing import TYPE_CHECKING
 
 from app.commands.command_decorator import (
     command,
-    get_command_name,
+    get_command_metadata,
 )
-from app.commands.command_registry import CommandRegistry
+from app.commands.command_registry import (
+    CommandRegistry,
+)
 
 if TYPE_CHECKING:
     from app.core.mz import MZ
@@ -39,19 +41,23 @@ class CommandProcessor:
                 attribute,
             )
 
-            command_name = get_command_name(
+            metadata = get_command_metadata(
                 underlying_function
             )
 
-            if command_name is None:
+            if metadata is None:
                 continue
 
             self.registry.register(
-                command_name,
-                attribute,
+                command=metadata.name,
+                handler=attribute,
+                metadata=metadata,
             )
 
-    def process(self, user_input: str) -> None:
+    def process(
+        self,
+        user_input: str,
+    ) -> None:
         parts = self.mz.input_processor.split(
             user_input
         )
@@ -86,22 +92,29 @@ class CommandProcessor:
         if suggestion:
             print(
                 f"{self.mz.name}: "
-                f"Comando desconocido: "
+                "Comando desconocido: "
                 f"'{command_name}'. "
-                f"¿Quisiste decir "
+                "¿Quisiste decir "
                 f"'{suggestion}'?"
             )
             return
 
         print(
             f"{self.mz.name}: "
-            f"Comando desconocido: "
+            "Comando desconocido: "
             f"'{command_name}'. "
             "Escribí 'ayuda' para ver "
             "los comandos."
         )
 
-    @command("recordar")
+    @command(
+        name="recordar",
+        usage="recordar <clave> <valor>",
+        description=(
+            "Guarda un dato en la memoria "
+            "persistente."
+        ),
+    )
     def remember(
         self,
         parts: list[str],
@@ -124,11 +137,15 @@ class CommandProcessor:
 
         print(
             f"{self.mz.name}: "
-            f"Recordaré que "
+            "Recordaré que "
             f"{key} = {value}."
         )
 
-    @command("hola")
+    @command(
+        name="hola",
+        usage="hola",
+        description="Saluda al usuario.",
+    )
     def greet(
         self,
         _parts: list[str],
@@ -138,20 +155,31 @@ class CommandProcessor:
             f"Hola, {self.mz.user}."
         )
 
-    @command("salir")
+    @command(
+        name="salir",
+        usage="salir",
+        description="Cierra la aplicación.",
+    )
     def exit_program(
         self,
         _parts: list[str],
     ) -> None:
         print(
             f"{self.mz.name}: "
-            f"Hasta luego, "
+            "Hasta luego, "
             f"{self.mz.user}."
         )
 
         self.mz.running = False
 
-    @command("consultar")
+    @command(
+        name="consultar",
+        usage="consultar <clave>",
+        description=(
+            "Consulta un dato guardado "
+            "en la memoria."
+        ),
+    )
     def recall(
         self,
         parts: list[str],
@@ -180,7 +208,14 @@ class CommandProcessor:
             f"{key} = {value}"
         )
 
-    @command("olvidar")
+    @command(
+        name="olvidar",
+        usage="olvidar <clave>",
+        description=(
+            "Elimina un dato de la "
+            "memoria persistente."
+        ),
+    )
     def forget(
         self,
         parts: list[str],
@@ -209,7 +244,14 @@ class CommandProcessor:
             f"guardado como '{key}'."
         )
 
-    @command("memorias")
+    @command(
+        name="memorias",
+        usage="memorias",
+        description=(
+            "Muestra todos los datos "
+            "guardados en memoria."
+        ),
+    )
     def show_memories(
         self,
         _parts: list[str],
@@ -232,7 +274,14 @@ class CommandProcessor:
         for key, value in memories.items():
             print(f"- {key}: {value}")
 
-    @command("preguntar")
+    @command(
+        name="preguntar",
+        usage="preguntar <consulta>",
+        description=(
+            "Envía una consulta al "
+            "servicio de inteligencia artificial."
+        ),
+    )
     def ask_ai(
         self,
         parts: list[str],
@@ -257,7 +306,14 @@ class CommandProcessor:
             f"{response}"
         )
 
-    @command("conversacion")
+    @command(
+        name="conversacion",
+        usage="conversacion",
+        description=(
+            "Muestra los mensajes de la "
+            "conversación actual."
+        ),
+    )
     def show_conversation(
         self,
         _parts: list[str],
@@ -298,7 +354,14 @@ class CommandProcessor:
                 f"{content}"
             )
 
-    @command("borrar_conversacion")
+    @command(
+        name="borrar_conversacion",
+        usage="borrar_conversacion",
+        description=(
+            "Elimina el historial de la "
+            "conversación actual."
+        ),
+    )
     def clear_conversation(
         self,
         _parts: list[str],
@@ -314,16 +377,25 @@ class CommandProcessor:
             "Conversación eliminada."
         )
 
-    @command("estado")
+    @command(
+        name="estado",
+        usage="estado",
+        description=(
+            "Muestra información sobre "
+            "el estado actual del sistema."
+        ),
+    )
     def show_status(
         self,
         _parts: list[str],
     ) -> None:
         memories = self.mz.memory.get_all()
+
         uptime = (
             self.mz.session
             .get_formatted_uptime()
         )
+
         command_count = len(
             self.mz.session.get_history()
         )
@@ -354,7 +426,14 @@ class CommandProcessor:
             f"{command_count}"
         )
 
-    @command("historial")
+    @command(
+        name="historial",
+        usage="historial",
+        description=(
+            "Muestra los comandos ejecutados "
+            "durante la sesión."
+        ),
+    )
     def show_history(
         self,
         _parts: list[str],
@@ -385,7 +464,11 @@ class CommandProcessor:
                 f"{command_name}"
             )
 
-    @command("limpiar")
+    @command(
+        name="limpiar",
+        usage="limpiar",
+        description="Limpia la consola.",
+    )
     def clear_console(
         self,
         _parts: list[str],
@@ -397,27 +480,30 @@ class CommandProcessor:
             "Consola limpiada."
         )
 
-    @command("ayuda")
+    @command(
+        name="ayuda",
+        usage="ayuda",
+        description=(
+            "Muestra los comandos disponibles "
+            "y una descripción de cada uno."
+        ),
+    )
     def show_help(
         self,
         _parts: list[str],
     ) -> None:
-        print(
-            f"""
-{self.mz.name}: Comandos disponibles:
-
-- hola
-- recordar <clave> <valor>
-- consultar <clave>
-- preguntar <consulta>
-- conversacion
-- borrar_conversacion
-- olvidar <clave>
-- memorias
-- estado
-- historial
-- limpiar
-- ayuda
-- salir
-"""
+        metadata_collection = (
+            self.registry.get_all_metadata()
         )
+
+        print(
+            f"{self.mz.name}: "
+            "Comandos disponibles:"
+        )
+        print()
+
+        for metadata in metadata_collection:
+            print(f"- {metadata.usage}")
+            print(
+                f"  {metadata.description}"
+            )

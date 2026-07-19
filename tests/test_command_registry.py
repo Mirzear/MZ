@@ -1,6 +1,9 @@
 import unittest
 from unittest.mock import Mock
 
+from app.commands.command_metadata import (
+    CommandMetadata,
+)
 from app.commands.command_registry import (
     CommandRegistry,
 )
@@ -23,7 +26,9 @@ class TestCommandRegistry(unittest.TestCase):
             self.registry.exists("hola")
         )
 
-    def test_get_registered_handler(self) -> None:
+    def test_get_registered_handler(
+        self,
+    ) -> None:
         handler = Mock()
 
         self.registry.register(
@@ -44,10 +49,14 @@ class TestCommandRegistry(unittest.TestCase):
         self,
     ) -> None:
         self.assertIsNone(
-            self.registry.get("desconocido")
+            self.registry.get(
+                "desconocido"
+            )
         )
 
-    def test_command_is_normalized(self) -> None:
+    def test_command_is_normalized(
+        self,
+    ) -> None:
         handler = Mock()
 
         self.registry.register(
@@ -90,7 +99,8 @@ class TestCommandRegistry(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.registry.register(
                 "hola",
-                "no soy callable",  # type: ignore[arg-type]
+                "no soy callable",
+                # type: ignore[arg-type]
             )
 
     def test_get_commands_returns_copy(
@@ -101,7 +111,9 @@ class TestCommandRegistry(unittest.TestCase):
             Mock(),
         )
 
-        commands = self.registry.get_commands()
+        commands = (
+            self.registry.get_commands()
+        )
         commands.add("falso")
 
         self.assertFalse(
@@ -123,6 +135,112 @@ class TestCommandRegistry(unittest.TestCase):
         self.assertEqual(
             self.registry.count(),
             2,
+        )
+
+    def test_register_command_with_metadata(
+        self,
+    ) -> None:
+        handler = Mock()
+        metadata = CommandMetadata(
+            name="hola",
+            usage="hola",
+            description="Saluda al usuario.",
+        )
+
+        self.registry.register(
+            "hola",
+            handler,
+            metadata,
+        )
+
+        registered_metadata = (
+            self.registry.get_metadata(
+                "hola"
+            )
+        )
+
+        self.assertIs(
+            registered_metadata,
+            metadata,
+        )
+
+    def test_unknown_command_has_no_metadata(
+        self,
+    ) -> None:
+        self.assertIsNone(
+            self.registry.get_metadata(
+                "desconocido"
+            )
+        )
+
+    def test_metadata_name_must_match_command(
+        self,
+    ) -> None:
+        metadata = CommandMetadata(
+            name="ayuda",
+            usage="ayuda",
+            description=(
+                "Muestra los comandos."
+            ),
+        )
+
+        with self.assertRaises(ValueError):
+            self.registry.register(
+                "hola",
+                Mock(),
+                metadata,
+            )
+
+    def test_get_all_metadata_returns_metadata(
+        self,
+    ) -> None:
+        hola_metadata = CommandMetadata(
+            name="hola",
+            usage="hola",
+            description="Saluda al usuario.",
+        )
+        ayuda_metadata = CommandMetadata(
+            name="ayuda",
+            usage="ayuda",
+            description=(
+                "Muestra los comandos."
+            ),
+        )
+
+        self.registry.register(
+            "hola",
+            Mock(),
+            hola_metadata,
+        )
+        self.registry.register(
+            "ayuda",
+            Mock(),
+            ayuda_metadata,
+        )
+
+        metadata_collection = (
+            self.registry.get_all_metadata()
+        )
+
+        self.assertEqual(
+            metadata_collection,
+            (
+                ayuda_metadata,
+                hola_metadata,
+            ),
+        )
+
+    def test_commands_without_metadata_are_excluded(
+        self,
+    ) -> None:
+        self.registry.register(
+            "hola",
+            Mock(),
+        )
+
+        self.assertEqual(
+            self.registry.get_all_metadata(),
+            (),
         )
 
 

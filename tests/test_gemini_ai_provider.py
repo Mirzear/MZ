@@ -14,19 +14,35 @@ from app.ai.ai_response import (
 from app.ai.gemini_ai_provider import (
     GeminiAIProvider,
 )
+from app.tools.tool_metadata import (
+    ToolMetadata,
+    ToolRiskLevel,
+)
+
+
+class FakeFunctionCall:
+    def __init__(
+        self,
+        *,
+        name: object,
+        args: object,
+    ) -> None:
+        self.name = name
+        self.args = args
 
 
 class FakeGeminiResponse:
-
     def __init__(
         self,
-        text: object,
+        text: object = None,
+        *,
+        function_calls: object = None,
     ) -> None:
         self.text = text
+        self.function_calls = function_calls
 
 
 class FakeModelsClient:
-
     def __init__(
         self,
         *,
@@ -38,16 +54,19 @@ class FakeModelsClient:
         self.calls = 0
         self.last_model: str | None = None
         self.last_contents: list | None = None
+        self.last_config: object | None = None
 
     def generate_content(
         self,
         *,
         model: str,
         contents: list,
+        config: object | None = None,
     ) -> object:
         self.calls += 1
         self.last_model = model
         self.last_contents = contents
+        self.last_config = config
 
         if self.error is not None:
             raise self.error
@@ -56,7 +75,6 @@ class FakeModelsClient:
 
 
 class FakeGeminiClient:
-
     def __init__(
         self,
         models: FakeModelsClient,
@@ -67,12 +85,12 @@ class FakeGeminiClient:
 class TestGeminiAIProvider(
     unittest.TestCase
 ):
-
     def _create_provider(
         self,
         *,
         response: object | None = None,
         error: Exception | None = None,
+        tools: tuple[ToolMetadata, ...] = (),
     ) -> tuple[
         GeminiAIProvider,
         FakeModelsClient,
@@ -81,18 +99,38 @@ class TestGeminiAIProvider(
             response=response,
             error=error,
         )
-
         client = FakeGeminiClient(
             models=models
         )
-
         provider = GeminiAIProvider(
             api_key="test-api-key",
             model="test-model",
+            tools=tools,
             client=client,
         )
 
         return provider, models
+
+    @staticmethod
+    def _create_tool_metadata(
+    ) -> ToolMetadata:
+        return ToolMetadata(
+            name="count_words",
+            description=(
+                "Cuenta las palabras de un texto."
+            ),
+            parameters={
+                "text": {
+                    "type": "string",
+                    "description": (
+                        "Texto que será analizado."
+                    ),
+                    "required": True,
+                }
+            },
+            risk_level=ToolRiskLevel.LOW,
+            requires_confirmation=False,
+        )
 
     def test_returns_structured_text_response(
         self,
@@ -126,7 +164,7 @@ class TestGeminiAIProvider(
     ) -> None:
         provider, _ = self._create_provider(
             response=FakeGeminiResponse(
-                "   Respuesta   "
+                " Respuesta "
             )
         )
 
@@ -139,6 +177,130 @@ class TestGeminiAIProvider(
             response.content,
             "Respuesta",
         )
+
+    def test_returns_tool_call_response(
+        self,
+    ) -> None:
+        provider, _ = self._create_provider(
+            response=FakeGeminiResponse(
+                function_calls=[
+                    FakeFunctionCall(
+                        name="count_words",
+                        args={
+                            "text": "Hola mundo",
+                        },
+                    )
+                ]
+            )
+        )
+
+        response = provider.generate_response(
+            prompt="Contá las palabras",
+            context=[],
+        )
+
+        self.assertTrue(
+            response.is_tool_call
+        )
+        self.assertIsNotNone(
+            response.tool_call
+        )
+        self.assertEqual(
+            response.tool_call.tool_name,
+            "count_words",
+        )
+        self.assertEqual(
+            dict(
+                response.tool_call.arguments
+            ),
+            {
+                "text": "Hola mundo",
+            },
+        )
+
+    def test_tool_call_accepts_missing_arguments(
+        self,
+    ) -> None:
+        provider, _ = self._create_provider(
+            response=FakeGeminiResponse(
+                function_calls=[
+                    FakeFunctionCall(
+                        name=(
+                            "get_current_datetime"
+                        ),
+                        args=None,
+                    )
+                ]
+            )
+        )
+
+        response = provider.generate_response(
+            prompt="¿Qué hora es?",
+            context=[],
+        )
+
+        self.assertEqual(
+            dict(
+                response.tool_call.arguments
+            ),
+            {},
+        )
+
+    def test_rejects_multiple_tool_calls(
+        self,
+    ) -> None:
+        provider, _ = self._create_provider(
+            response=FakeGeminiResponse(
+                function_calls=[
+                    FakeFunctionCall(
+                        name="tool_one",
+                        args={},
+                    ),
+                    FakeFunctionCall(
+                        name="tool_two",
+                        args={},
+                    ),
+                ]
+            )
+        )
+
+        with self.assertRaises(
+            AIProviderError
+        ) as context:
+            provider.generate_response(
+                prompt="Ejecutá herramientas",
+                context=[],
+            )
+
+        self.assertEqual(
+            context.exception.kind,
+            (
+                AIProviderErrorKind
+                .INVALID_RESPONSE
+            ),
+        )
+
+    def test_rejects_tool_call_without_name(
+        self,
+    ) -> None:
+        provider, _ = self._create_provider(
+            response=FakeGeminiResponse(
+                function_calls=[
+                    FakeFunctionCall(
+                        name=" ",
+                        args={},
+                    )
+                ]
+            )
+        )
+
+        with self.assertRaises(
+            AIProviderError
+        ):
+            provider.generate_response(
+                prompt="Ejecutá",
+                context=[],
+            )
 
     def test_sends_configured_model(
         self,
@@ -161,6 +323,118 @@ class TestGeminiAIProvider(
             "test-model",
         )
 
+    def test_does_not_send_tool_config_without_tools(
+        self,
+    ) -> None:
+        provider, models = (
+            self._create_provider(
+                response=FakeGeminiResponse(
+                    "Respuesta"
+                )
+            )
+        )
+
+        provider.generate_response(
+            prompt="Hola",
+            context=[],
+        )
+
+        self.assertIsNone(
+            models.last_config
+        )
+
+    def test_sends_tool_declarations(
+        self,
+    ) -> None:
+        metadata = (
+            self._create_tool_metadata()
+        )
+        provider, models = (
+            self._create_provider(
+                response=FakeGeminiResponse(
+                    "Respuesta"
+                ),
+                tools=(metadata,),
+            )
+        )
+
+        provider.generate_response(
+            prompt="Hola",
+            context=[],
+        )
+
+        config = models.last_config
+
+        self.assertIsNotNone(config)
+        self.assertEqual(
+            len(config.tools),
+            1,
+        )
+
+        declarations = (
+            config.tools[0]
+            .function_declarations
+        )
+
+        self.assertEqual(
+            len(declarations),
+            1,
+        )
+        self.assertEqual(
+            declarations[0].name,
+            "count_words",
+        )
+
+        schema = (
+            declarations[0]
+            .parameters_json_schema
+        )
+
+        self.assertEqual(
+            schema["type"],
+            "object",
+        )
+        self.assertEqual(
+            schema["required"],
+            ["text"],
+        )
+        self.assertEqual(
+            schema["properties"]["text"][
+                "type"
+            ],
+            "string",
+        )
+
+    def test_tools_property_returns_metadata(
+        self,
+    ) -> None:
+        metadata = (
+            self._create_tool_metadata()
+        )
+        provider, _ = self._create_provider(
+            response=FakeGeminiResponse(
+                "Respuesta"
+            ),
+            tools=(metadata,),
+        )
+
+        self.assertEqual(
+            provider.tools,
+            (metadata,),
+        )
+
+    def test_rejects_invalid_tools(
+        self,
+    ) -> None:
+        with self.assertRaises(TypeError):
+            GeminiAIProvider(
+                api_key="test-api-key",
+                model="test-model",
+                tools=(
+                    object(),  # type: ignore[arg-type]
+                ),
+            )
+
     def test_converts_conversation_roles(
         self,
     ) -> None:
@@ -177,11 +451,15 @@ class TestGeminiAIProvider(
             context=[
                 {
                     "role": "user",
-                    "content": "Pregunta anterior",
+                    "content": (
+                        "Pregunta anterior"
+                    ),
                 },
                 {
                     "role": "assistant",
-                    "content": "Respuesta anterior",
+                    "content": (
+                        "Respuesta anterior"
+                    ),
                 },
             ],
         )
@@ -244,9 +522,7 @@ class TestGeminiAIProvider(
         self,
     ) -> None:
         provider, _ = self._create_provider(
-            response=FakeGeminiResponse(
-                "   "
-            )
+            response=FakeGeminiResponse(" ")
         )
 
         with self.assertRaises(
@@ -381,10 +657,7 @@ class TestGeminiAIProvider(
 
         self.assertEqual(
             context.exception.kind,
-            (
-                AIProviderErrorKind
-                .RATE_LIMIT
-            ),
+            AIProviderErrorKind.RATE_LIMIT,
         )
 
     def test_service_error_is_translated(
@@ -425,7 +698,6 @@ class TestGeminiAIProvider(
             method="POST",
             url="https://example.com",
         )
-
         provider, _ = self._create_provider(
             error=httpx.ReadTimeout(
                 "Timeout",
@@ -453,7 +725,6 @@ class TestGeminiAIProvider(
             method="POST",
             url="https://example.com",
         )
-
         provider, _ = self._create_provider(
             error=httpx.ConnectError(
                 "Connection failed",
@@ -477,23 +748,19 @@ class TestGeminiAIProvider(
     def test_rejects_empty_api_key(
         self,
     ) -> None:
-        with self.assertRaises(
-            ValueError
-        ):
+        with self.assertRaises(ValueError):
             GeminiAIProvider(
-                api_key="   ",
+                api_key=" ",
                 model="test-model",
             )
 
     def test_rejects_empty_model(
         self,
     ) -> None:
-        with self.assertRaises(
-            ValueError
-        ):
+        with self.assertRaises(ValueError):
             GeminiAIProvider(
                 api_key="test-api-key",
-                model="   ",
+                model=" ",
             )
 
 

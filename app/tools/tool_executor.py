@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from typing import Any
 
+from app.tools.tool_call import ToolCall
 from app.tools.tool_execution_result import (
     ToolExecutionResult,
     ToolExecutionStatus,
@@ -53,6 +54,42 @@ class ToolExecutor:
         *,
         confirmed: bool = False,
     ) -> ToolExecutionResult:
+        return self._execute(
+            tool_name=tool_name,
+            arguments=arguments,
+            confirmed=confirmed,
+            call_id=None,
+        )
+
+    def execute_call(
+        self,
+        tool_call: ToolCall,
+    ) -> ToolExecutionResult:
+        if not isinstance(
+            tool_call,
+            ToolCall,
+        ):
+            raise TypeError(
+                "tool_call debe ser una "
+                "instancia de ToolCall."
+            )
+
+        return self._execute(
+            tool_name=tool_call.tool_name,
+            arguments=tool_call.arguments,
+            confirmed=tool_call.confirmed,
+            call_id=tool_call.call_id,
+        )
+
+    def _execute(
+        self,
+        tool_name: Any,
+        arguments: (
+            Mapping[str, Any] | None
+        ),
+        confirmed: bool,
+        call_id: str | None,
+    ) -> ToolExecutionResult:
         normalized_name = (
             self._normalize_tool_name(
                 tool_name
@@ -69,6 +106,7 @@ class ToolExecutor:
                     "El nombre de la herramienta "
                     "debe ser una cadena no vacía."
                 ),
+                call_id=call_id,
             )
 
         metadata = (
@@ -95,6 +133,7 @@ class ToolExecutor:
                     f"'{normalized_name}' "
                     "no está registrada."
                 ),
+                call_id=call_id,
             )
 
         if (
@@ -112,6 +151,7 @@ class ToolExecutor:
                     f"'{normalized_name}' "
                     "requiere confirmación."
                 ),
+                call_id=call_id,
             )
 
         normalized_arguments = (
@@ -130,6 +170,7 @@ class ToolExecutor:
                     "Los argumentos deben ser "
                     "un mapping."
                 ),
+                call_id=call_id,
             )
 
         validation_error = (
@@ -148,6 +189,7 @@ class ToolExecutor:
                     ToolExecutionStatus.ERROR
                 ),
                 error_message=validation_error,
+                call_id=call_id,
             )
 
         try:
@@ -166,6 +208,7 @@ class ToolExecutor:
                     "produjo un error: "
                     f"{error}"
                 ),
+                call_id=call_id,
             )
 
         return ToolExecutionResult(
@@ -174,6 +217,7 @@ class ToolExecutor:
                 ToolExecutionStatus.SUCCESS
             ),
             output=output,
+            call_id=call_id,
         )
 
     @staticmethod
@@ -266,7 +310,7 @@ class ToolExecutor:
             ):
                 return (
                     "Falta el parámetro "
-                    f"requerido "
+                    "requerido "
                     f"'{parameter_name}'."
                 )
 

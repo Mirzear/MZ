@@ -17,6 +17,7 @@ class ToolExecutionResult:
     status: ToolExecutionStatus
     output: Any = None
     error_message: str | None = None
+    call_id: str | None = None
 
     def __post_init__(self) -> None:
         normalized_name = (
@@ -58,10 +59,37 @@ class ToolExecutionResult:
                 "contener un mensaje de error."
             )
 
+        normalized_call_id = self.call_id
+
+        if normalized_call_id is not None:
+            if not isinstance(
+                normalized_call_id,
+                str,
+            ):
+                raise TypeError(
+                    "call_id debe ser una cadena "
+                    "de caracteres o None."
+                )
+
+            normalized_call_id = (
+                normalized_call_id.strip()
+            )
+
+            if not normalized_call_id:
+                raise ValueError(
+                    "call_id no puede ser una "
+                    "cadena vacía."
+                )
+
         object.__setattr__(
             self,
             "tool_name",
             normalized_name,
+        )
+        object.__setattr__(
+            self,
+            "call_id",
+            normalized_call_id,
         )
 
     @property

@@ -1,14 +1,21 @@
 from app.ai.ai_service import AIService
 from app.ai.mock_ai_provider import MockAIProvider
-from app.commands.command_processor import CommandProcessor
-from app.commands.command_registry import CommandRegistry
+from app.commands.command_processor import (
+    CommandProcessor,
+)
+from app.commands.command_registry import (
+    CommandRegistry,
+)
 from app.core.config_manager import ConfigManager
 from app.core.input_processor import InputProcessor
 from app.core.logger import Logger
 from app.core.memory_manager import MemoryManager
-from app.core.session_manager import SessionManager
+from app.core.session_manager import (
+    SessionManager,
+)
 from app.core.system_manager import SystemManager
 from app.tools.core_tools import CoreTools
+from app.tools.tool_executor import ToolExecutor
 from app.tools.tool_loader import ToolLoader
 from app.tools.tool_registry import ToolRegistry
 
@@ -36,6 +43,10 @@ class MZ:
 
         self.tool_loader.load(
             self.core_tools
+        )
+
+        self.tool_executor = ToolExecutor(
+            registry=self.tool_registry,
         )
 
         self.command_registry = CommandRegistry()
@@ -81,14 +92,28 @@ class MZ:
         print("[✔] Núcleo cargado")
         print("[✔] Configuración cargada")
         print("[✔] Memoria cargada")
-        print("[✔] Procesador de comandos cargado")
-        print("[✔] Procesador de entrada cargado")
-        print("[✔] Gestor de sesión cargado")
-        print("[✔] Gestor del sistema cargado")
+        print(
+            "[✔] Procesador de comandos "
+            "cargado"
+        )
+        print(
+            "[✔] Procesador de entrada "
+            "cargado"
+        )
+        print(
+            "[✔] Gestor de sesión cargado"
+        )
+        print(
+            "[✔] Gestor del sistema cargado"
+        )
         print("[✔] Servicio de IA cargado")
         print(
             "[✔] Herramientas cargadas: "
             f"{self.tool_registry.count()}"
+        )
+        print(
+            "[✔] Ejecutor de herramientas "
+            "cargado"
         )
 
         print()
@@ -102,7 +127,9 @@ class MZ:
 
     def run_conversation_loop(self) -> None:
         while self.running:
-            user_input = input("\nTú: ").strip()
+            user_input = input(
+                "\nTú: "
+            ).strip()
 
             if not user_input:
                 continue

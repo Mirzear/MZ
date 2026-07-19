@@ -3,6 +3,9 @@ from contextlib import redirect_stdout
 from io import StringIO
 
 from app.core.mz import MZ
+from app.tools.tool_execution_result import (
+    ToolExecutionStatus,
+)
 
 
 class TestMZToolIntegration(
@@ -90,6 +93,36 @@ class TestMZToolIntegration(
         self.assertIn(
             "Riesgo: low",
             result,
+        )
+
+    def test_mz_has_tool_executor(
+        self,
+    ) -> None:
+        self.assertIsNotNone(
+            self.mz.tool_executor
+        )
+
+    def test_mz_executor_runs_core_tool(
+        self,
+    ) -> None:
+        result = (
+            self.mz.tool_executor.execute(
+                "count_words",
+                {
+                    "text": (
+                        "MZ tiene un ejecutor"
+                    ),
+                },
+            )
+        )
+
+        self.assertEqual(
+            result.status,
+            ToolExecutionStatus.SUCCESS,
+        )
+        self.assertEqual(
+            result.output,
+            4,
         )
 
 

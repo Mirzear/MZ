@@ -8,6 +8,9 @@ from app.core.logger import Logger
 from app.core.memory_manager import MemoryManager
 from app.core.session_manager import SessionManager
 from app.core.system_manager import SystemManager
+from app.tools.core_tools import CoreTools
+from app.tools.tool_loader import ToolLoader
+from app.tools.tool_registry import ToolRegistry
 
 
 class MZ:
@@ -21,6 +24,18 @@ class MZ:
 
         self.ai = AIService(
             provider=MockAIProvider()
+        )
+
+        self.tool_registry = ToolRegistry()
+
+        self.tool_loader = ToolLoader(
+            registry=self.tool_registry,
+        )
+
+        self.core_tools = CoreTools()
+
+        self.tool_loader.load(
+            self.core_tools
         )
 
         self.command_registry = CommandRegistry()
@@ -71,6 +86,10 @@ class MZ:
         print("[✔] Gestor de sesión cargado")
         print("[✔] Gestor del sistema cargado")
         print("[✔] Servicio de IA cargado")
+        print(
+            "[✔] Herramientas cargadas: "
+            f"{self.tool_registry.count()}"
+        )
 
         print()
         print(f"Hola {self.user}.")

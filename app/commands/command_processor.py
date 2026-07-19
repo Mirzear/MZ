@@ -481,6 +481,73 @@ class CommandProcessor:
         )
 
     @command(
+        name="herramientas",
+        usage="herramientas",
+        description=(
+            "Muestra las herramientas "
+            "disponibles para MZ."
+        ),
+    )
+    def show_tools(
+        self,
+        _parts: list[str],
+    ) -> None:
+        metadata_collection = (
+            self.mz.tool_registry
+            .get_all_metadata()
+        )
+
+        if not metadata_collection:
+            print(
+                f"{self.mz.name}: "
+                "No hay herramientas "
+                "registradas."
+            )
+            return
+
+        print(
+            f"{self.mz.name}: "
+            "Herramientas disponibles:"
+        )
+        print()
+
+        for metadata in metadata_collection:
+            confirmation = (
+                "sí"
+                if metadata.requires_confirmation
+                else "no"
+            )
+
+            print(f"- {metadata.name}")
+            print(
+                f"  {metadata.description}"
+            )
+            print(
+                "  Riesgo: "
+                f"{metadata.risk_level.value}"
+            )
+            print(
+                "  Requiere confirmación: "
+                f"{confirmation}"
+            )
+
+            if metadata.parameters:
+                parameter_names = ", ".join(
+                    metadata.parameters
+                )
+
+                print(
+                    "  Parámetros: "
+                    f"{parameter_names}"
+                )
+            else:
+                print(
+                    "  Parámetros: ninguno"
+                )
+
+            print()
+            
+    @command(
         name="ayuda",
         usage="ayuda",
         description=(
@@ -488,6 +555,7 @@ class CommandProcessor:
             "y una descripción de cada uno."
         ),
     )
+
     def show_help(
         self,
         _parts: list[str],

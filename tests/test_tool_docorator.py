@@ -274,6 +274,39 @@ class TestToolDecorator(unittest.TestCase):
             def handler() -> None:
                 pass
 
+    def test_get_metadata_from_bound_method(
+        self,
+    ) -> None:
+        class ExampleTools:
+
+            @tool(
+                name="example",
+                description=(
+                    "Herramienta de ejemplo."
+                ),
+            )
+            def example(self) -> str:
+                return "resultado"
+
+        tools = ExampleTools()
+
+        metadata = get_tool_metadata(
+            tools.example
+        )
+
+        self.assertIsNotNone(metadata)
+
+        if metadata is None:
+            self.fail(
+                "No se recuperaron los "
+                "metadatos del método."
+            )
+
+        self.assertEqual(
+            metadata.name,
+            "example",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -53,8 +53,14 @@ def tool(
 def get_tool_metadata(
     function: Any,
 ) -> ToolMetadata | None:
-    metadata = getattr(
+    original_function = getattr(
         function,
+        "__func__",
+        function,
+    )
+
+    metadata = getattr(
+        original_function,
         _METADATA_ATTRIBUTE,
         None,
     )

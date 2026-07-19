@@ -1,7 +1,20 @@
 {
     "name": "MZ",
-    "version": "2.1.1",
+    "version": "2.2.0",
     "user": "Agustín",
     "personality": "asistente",
-    "language": "español"
+    "language": "español",
+    "ai": {
+        "providers": [
+            {
+                "name": "gemini",
+                "enabled": true,
+                "model": "gemini-2.5-flash"
+            },
+            {
+                "name": "mock",
+                "enabled": true
+            }
+        ]
+    }
 }

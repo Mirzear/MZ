@@ -1,5 +1,7 @@
+from app.ai.ai_provider_factory import (
+    AIProviderFactory,
+)
 from app.ai.ai_service import AIService
-from app.ai.mock_ai_provider import MockAIProvider
 from app.commands.command_processor import (
     CommandProcessor,
 )
@@ -29,8 +31,17 @@ class MZ:
         self.memory = MemoryManager()
         self.system = SystemManager()
 
+        self.ai_provider_factory = (
+            AIProviderFactory(
+                config=self.config,
+            )
+        )
+
         self.ai = AIService(
-            provider=MockAIProvider()
+            provider=(
+                self.ai_provider_factory
+                .create()
+            )
         )
 
         self.tool_registry = ToolRegistry()

@@ -9,7 +9,6 @@ from app.tools.tool_executor import ToolExecutor
 
 
 class AgentService:
-
     def __init__(
         self,
         ai_service: AIService,
@@ -34,12 +33,15 @@ class AgentService:
                 "instancia de ToolExecutor."
             )
 
-        if not isinstance(
-            max_tool_calls,
-            int,
-        ) or isinstance(
-            max_tool_calls,
-            bool,
+        if (
+            not isinstance(
+                max_tool_calls,
+                int,
+            )
+            or isinstance(
+                max_tool_calls,
+                bool,
+            )
         ):
             raise TypeError(
                 "max_tool_calls debe ser un "
@@ -56,6 +58,10 @@ class AgentService:
         self._tool_executor = tool_executor
         self._max_tool_calls = max_tool_calls
 
+    @property
+    def max_tool_calls(self) -> int:
+        return self._max_tool_calls
+
     def ask(
         self,
         prompt: str,
@@ -68,10 +74,28 @@ class AgentService:
         self,
         prompt: str,
     ) -> AIResponse:
-        response = self._ai_service.request(
+        original_prompt = self._normalize_prompt(
             prompt
         )
 
+        response = self._ai_service.request(
+            prompt,
+            store_exchange=False,
+        )
+
+        if original_prompt is None:
+            return response
+
+        if response.is_text:
+            self._store_final_response(
+                original_prompt=original_prompt,
+                response=response,
+            )
+            return response
+
+        tool_results: list[
+            ToolExecutionResult
+        ] = []
         executed_tool_calls = 0
 
         while response.is_tool_call:
@@ -98,44 +122,122 @@ class AgentService:
                     tool_call
                 )
             )
-
             executed_tool_calls += 1
 
             if result.requires_confirmation:
-                return AIResponse.from_text(
-                    result.error_message
-                    or (
-                        "La herramienta requiere "
-                        "confirmación."
+                confirmation_response = (
+                    AIResponse.from_text(
+                        result.error_message
+                        or (
+                            "La herramienta requiere "
+                            "confirmación."
+                        )
                     )
                 )
 
-            response = self._ai_service.request(
-                self._build_tool_result_prompt(
-                    result
+                self._store_final_response(
+                    original_prompt=(
+                        original_prompt
+                    ),
+                    response=(
+                        confirmation_response
+                    ),
                 )
+
+                return confirmation_response
+
+            tool_results.append(result)
+
+            agent_prompt = (
+                self._build_agent_prompt(
+                    original_prompt=(
+                        original_prompt
+                    ),
+                    tool_results=tool_results,
+                )
+            )
+
+            response = (
+                self._ai_service.request(
+                    agent_prompt,
+                    store_exchange=False,
+                )
+            )
+
+        if response.is_text:
+            self._store_final_response(
+                original_prompt=original_prompt,
+                response=response,
             )
 
         return response
 
-    @staticmethod
-    def _build_tool_result_prompt(
+    def _store_final_response(
+        self,
+        *,
+        original_prompt: str,
+        response: AIResponse,
+    ) -> None:
+        self._ai_service.record_completed_exchange(
+            prompt=original_prompt,
+            response=response,
+        )
+
+    @classmethod
+    def _build_agent_prompt(
+        cls,
+        *,
+        original_prompt: str,
+        tool_results: list[
+            ToolExecutionResult
+        ],
+    ) -> str:
+        formatted_results = "\n\n".join(
+            cls._format_tool_result(
+                result=result,
+                position=position,
+            )
+            for position, result in enumerate(
+                tool_results,
+                start=1,
+            )
+        )
+
+        return (
+            "Consulta original del usuario:\n"
+            f"{original_prompt}\n\n"
+            "Resultados de herramientas "
+            "disponibles:\n"
+            f"{formatted_results}\n\n"
+            "Usá toda la información anterior "
+            "para continuar resolviendo la "
+            "consulta original. Podés solicitar "
+            "otra herramienta si todavía es "
+            "necesaria. Cuando tengas suficiente "
+            "información, respondé directamente "
+            "al usuario."
+        )
+
+    @classmethod
+    def _format_tool_result(
+        cls,
+        *,
         result: ToolExecutionResult,
+        position: int,
     ) -> str:
         if result.succeeded:
-            result_value = (
-                AgentService._format_value(
-                    result.output
-                )
+            result_value = cls._format_value(
+                result.output
             )
 
             return (
-                "Resultado de la herramienta "
-                f"'{result.tool_name}':\n"
-                f"Estado: {result.status.value}\n"
-                f"Resultado: {result_value}\n"
-                "Usá este resultado para responder "
-                "la consulta original del usuario."
+                f"Resultado {position}:\n"
+                f"- Herramienta: "
+                f"{result.tool_name}\n"
+                f"- Estado: "
+                f"{result.status.value}\n"
+                f"- Resultado: "
+                f"{result_value}"
             )
 
         error_message = (
@@ -144,12 +246,12 @@ class AgentService:
         )
 
         return (
-            "La ejecución de la herramienta "
-            f"'{result.tool_name}' falló:\n"
-            f"Estado: {result.status.value}\n"
-            f"Error: {error_message}\n"
-            "Explicá el problema al usuario o "
-            "elegí otra acción válida."
+            f"Resultado {position}:\n"
+            f"- Herramienta: "
+            f"{result.tool_name}\n"
+            f"- Estado: "
+            f"{result.status.value}\n"
+            f"- Error: {error_message}"
         )
 
     @staticmethod
@@ -160,3 +262,17 @@ class AgentService:
             return "None"
 
         return str(value)
+
+    @staticmethod
+    def _normalize_prompt(
+        prompt: object,
+    ) -> str | None:
+        if not isinstance(prompt, str):
+            return None
+
+        cleaned_prompt = prompt.strip()
+
+        if not cleaned_prompt:
+            return None
+
+        return cleaned_prompt

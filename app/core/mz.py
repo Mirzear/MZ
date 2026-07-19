@@ -1,3 +1,4 @@
+from app.agent.agent_service import AgentService
 from app.ai.ai_provider_factory import (
     AIProviderFactory,
 )
@@ -60,6 +61,12 @@ class MZ:
             )
         )
 
+        self.agent = AgentService(
+            ai_service=self.ai,
+            tool_executor=self.tool_executor,
+            max_tool_calls=5,
+        )
+
         self.command_registry = CommandRegistry()
 
         self.input_processor = InputProcessor(
@@ -114,6 +121,7 @@ class MZ:
             "[✔] Gestor del sistema cargado"
         )
         print("[✔] Servicio de IA cargado")
+        print("[✔] Agente de IA cargado")
         print(
             "[✔] Herramientas cargadas: "
             f"{self.tool_registry.count()}"

@@ -143,6 +143,35 @@ class TestMZToolIntegration(
             ),
             2,
         )
+    
+    def test_mz_has_agent_service(
+        self,
+    ) -> None:
+        self.assertIsNotNone(
+            self.mz.agent
+        )
+        self.assertEqual(
+            self.mz.agent.max_tool_calls,
+            5,
+        )
+
+
+    def test_agent_uses_mz_tool_executor(
+        self,
+    ) -> None:
+        self.assertIs(
+            self.mz.agent._tool_executor,
+            self.mz.tool_executor,
+        )
+
+
+    def test_agent_uses_mz_ai_service(
+        self,
+    ) -> None:
+        self.assertIs(
+            self.mz.agent._ai_service,
+            self.mz.ai,
+        )
 
 
 if __name__ == "__main__":

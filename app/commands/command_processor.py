@@ -282,29 +282,38 @@ class CommandProcessor:
             "servicio de inteligencia artificial."
         ),
     )
+    @command(
+    name="preguntar",
+    usage="preguntar <consulta>",
+    description=(
+        "Envía una consulta al agente de "
+        "inteligencia artificial."
+    ),
+)
     def ask_ai(
-        self,
-        parts: list[str],
-    ) -> None:
-        if len(parts) < 2:
+            self,
+            parts: list[str],
+        ) -> None:
+            if len(parts) < 2:
+                print(
+                    f"{self.mz.name}: "
+                    "Uso correcto: "
+                    "preguntar <consulta>"
+                )
+                return
+
+            prompt = " ".join(parts[1:])
+
+            response = self.mz.agent.ask(prompt)
+
+            self.mz.logger.info(
+                "AI agent response generated"
+            )
+
             print(
                 f"{self.mz.name}: "
-                "Uso correcto: "
-                "preguntar <consulta>"
+                f"{response}"
             )
-            return
-
-        prompt = " ".join(parts[1:])
-        response = self.mz.ai.ask(prompt)
-
-        self.mz.logger.info(
-            "AI response generated"
-        )
-
-        print(
-            f"{self.mz.name}: "
-            f"{response}"
-        )
 
     @command(
         name="conversacion",

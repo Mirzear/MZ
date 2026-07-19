@@ -243,6 +243,63 @@ class TestAIService(unittest.TestCase):
                 provider=object()
             )
 
+    def test_can_request_without_storing_exchange(
+        self,
+    ) -> None:
+        provider = MockAIProvider()
+        service = AIService(provider)
+
+        response = service.request(
+            "Consulta temporal",
+            store_exchange=False,
+        )
+
+        self.assertTrue(response.is_text)
+        self.assertEqual(
+            response.content,
+            (
+                "Respuesta simulada de IA para: "
+                "Consulta temporal "
+                "[contexto previo: 0 mensajes]"
+            ),
+        )
+        self.assertEqual(
+            service.get_conversation(),
+            [],
+        )
+
+
+    def test_records_completed_exchange_manually(
+        self,
+    ) -> None:
+        service = AIService(
+            provider=MockAIProvider()
+        )
+
+        service.record_completed_exchange(
+            prompt="Consulta original",
+            response=AIResponse.from_text(
+                "Respuesta final"
+            ),
+        )
+
+        self.assertEqual(
+            service.get_conversation(),
+            [
+                {
+                    "role": "user",
+                    "content": (
+                        "Consulta original"
+                    ),
+                },
+                {
+                    "role": "assistant",
+                    "content": (
+                        "Respuesta final"
+                    ),
+                },
+            ],
+        )
 
 if __name__ == "__main__":
     unittest.main()

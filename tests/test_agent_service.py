@@ -372,6 +372,165 @@ class TestAgentService(unittest.TestCase):
             tool_executor=self.executor,
             max_tool_calls=max_tool_calls,
         )
+    
+    def test_accumulates_multiple_tool_results(
+        self,
+    ) -> None:
+        provider = SequenceProvider(
+            responses=[
+                AIResponse.from_tool_call(
+                    ToolCall(
+                        tool_name="count_words",
+                        arguments={
+                            "text": "uno dos",
+                        },
+                    )
+                ),
+                AIResponse.from_tool_call(
+                    ToolCall(
+                        tool_name="count_words",
+                        arguments={
+                            "text": (
+                                "tres cuatro cinco"
+                            ),
+                        },
+                    )
+                ),
+                AIResponse.from_text(
+                    "Los resultados son 2 y 3."
+                ),
+            ]
+        )
+
+        agent = self._build_agent(provider)
+
+        response = agent.run(
+            "Contá ambos textos"
+        )
+
+        self.assertTrue(response.is_text)
+        self.assertEqual(
+            len(provider.prompts),
+            3,
+        )
+
+        final_agent_prompt = (
+            provider.prompts[2]
+        )
+
+        self.assertIn(
+            "Consulta original del usuario",
+            final_agent_prompt,
+        )
+        self.assertIn(
+            "Contá ambos textos",
+            final_agent_prompt,
+        )
+        self.assertIn(
+            "Resultado: 2",
+            final_agent_prompt,
+        )
+        self.assertIn(
+            "Resultado: 3",
+            final_agent_prompt,
+        )
+
+
+    def test_stores_original_exchange_after_tools(
+            self,
+        ) -> None:
+            provider = SequenceProvider(
+                responses=[
+                    AIResponse.from_tool_call(
+                        ToolCall(
+                            tool_name="count_words",
+                            arguments={
+                                "text": "uno dos tres",
+                            },
+                        )
+                    ),
+                    AIResponse.from_text(
+                        "El texto tiene 3 palabras."
+                    ),
+                ]
+            )
+
+            ai_service = AIService(provider)
+
+            agent = AgentService(
+                ai_service=ai_service,
+                tool_executor=self.executor,
+            )
+
+            agent.run(
+                "¿Cuántas palabras tiene el texto?"
+            )
+
+            conversation = (
+                ai_service.get_conversation()
+            )
+
+            self.assertEqual(
+                conversation,
+                [
+                    {
+                        "role": "user",
+                        "content": (
+                            "¿Cuántas palabras "
+                            "tiene el texto?"
+                        ),
+                    },
+                    {
+                        "role": "assistant",
+                        "content": (
+                            "El texto tiene "
+                            "3 palabras."
+                        ),
+                    },
+                ],
+            )
+
+
+    def test_does_not_store_internal_agent_prompt(
+            self,
+        ) -> None:
+            provider = SequenceProvider(
+                responses=[
+                    AIResponse.from_tool_call(
+                        ToolCall(
+                            tool_name="count_words",
+                            arguments={
+                                "text": "uno dos",
+                            },
+                        )
+                    ),
+                    AIResponse.from_text(
+                        "Resultado final"
+                    ),
+                ]
+            )
+
+            ai_service = AIService(provider)
+
+            agent = AgentService(
+                ai_service=ai_service,
+                tool_executor=self.executor,
+            )
+
+            agent.run("Consulta visible")
+
+            conversation_text = str(
+                ai_service.get_conversation()
+            )
+
+            self.assertNotIn(
+                "Resultados de herramientas",
+                conversation_text,
+            )
+            self.assertNotIn(
+                "Estado: success",
+                conversation_text,
+            )
 
 
 if __name__ == "__main__":

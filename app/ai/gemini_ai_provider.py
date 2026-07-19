@@ -39,6 +39,7 @@ class GeminiClient(Protocol):
 
 
 class GeminiAIProvider:
+    
     def __init__(
         self,
         api_key: str,
@@ -125,7 +126,8 @@ class GeminiAIProvider:
 
         function_call_response = (
             self._extract_function_call(
-                response
+                response=response,
+                contents=contents,
             )
         )
 
@@ -156,8 +158,10 @@ class GeminiAIProvider:
         )
 
     def _extract_function_call(
-        self,
+         self,
+        *,
         response: object,
+        contents: list[types.Content],
     ) -> AIResponse | None:
         function_calls = getattr(
             response,
@@ -263,14 +267,18 @@ class GeminiAIProvider:
             ),
             provider_state=(
                 self._build_turn_state(
-                    response
+                    response=response,
+                    contents=contents,
                 )
             ),
-        )
+
+            )
 
     def _build_turn_state(
         self,
+        *,
         response: object,
+        contents: list[types.Content],
     ) -> GeminiTurnState:
         candidates = getattr(
             response,
@@ -338,8 +346,10 @@ class GeminiAIProvider:
             )
 
         return GeminiTurnState(
+            contents=tuple(contents),
             model_content=model_content,
         )
+
 
     def _extract_text_response(
         self,

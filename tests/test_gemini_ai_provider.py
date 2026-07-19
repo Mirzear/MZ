@@ -309,10 +309,25 @@ class TestGeminiAIProvider(
             response.provider_state,
             GeminiTurnState,
         )
+
+        expected_contents = (
+            provider._build_contents(
+            prompt="Contá las palabras",
+            context=[],
+            )
+        )
+
+        self.assertEqual(
+            response.provider_state.contents,
+            tuple(expected_contents),
+        )
+
         self.assertIsInstance(
             response.provider_state.model_content,
             types.Content,
         )
+
+    
 
     def test_rejects_multiple_tool_calls(
         self,

@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Any, Protocol
+from typing import Protocol
 
 import httpx
 from google import genai
@@ -10,7 +10,12 @@ from app.ai.ai_provider_error import (
     AIProviderErrorKind,
 )
 from app.ai.ai_response import AIResponse
-from app.ai.gemini_tool_mapper import GeminiToolMapper
+from app.ai.gemini_tool_mapper import (
+    GeminiToolMapper,
+)
+from app.ai.gemini_turn_state import (
+    GeminiTurnState,
+)
 from app.tools.tool_call import ToolCall
 from app.tools.tool_metadata import ToolMetadata
 
@@ -21,7 +26,10 @@ class GeminiModelsClient(Protocol):
         *,
         model: str,
         contents: list[types.Content],
-        config: types.GenerateContentConfig | None = None,
+        config: (
+            types.GenerateContentConfig
+            | None
+        ) = None,
     ) -> object:
         ...
 
@@ -39,16 +47,20 @@ class GeminiAIProvider:
         tools: Iterable[ToolMetadata] = (),
         client: GeminiClient | None = None,
     ) -> None:
-        self._api_key = self._normalize_required_text(
-            value=api_key,
-            field_name="api_key",
+        self._api_key = (
+            self._normalize_required_text(
+                value=api_key,
+                field_name="api_key",
+            )
         )
-        self._model = self._normalize_required_text(
-            value=model,
-            field_name="model",
+        self._model = (
+            self._normalize_required_text(
+                value=model,
+                field_name="model",
+            )
         )
-        self._tool_metadata = self._normalize_tools(
-            tools
+        self._tool_metadata = (
+            self._normalize_tools(tools)
         )
         self._client: GeminiClient = (
             client
@@ -63,7 +75,9 @@ class GeminiAIProvider:
         return self._model
 
     @property
-    def tools(self) -> tuple[ToolMetadata, ...]:
+    def tools(
+        self,
+    ) -> tuple[ToolMetadata, ...]:
         return self._tool_metadata
 
     def generate_response(
@@ -79,7 +93,8 @@ class GeminiAIProvider:
 
         try:
             response = (
-                self._client.models.generate_content(
+                self._client.models
+                .generate_content(
                     model=self._model,
                     contents=contents,
                     config=config,
@@ -93,31 +108,44 @@ class GeminiAIProvider:
             raise AIProviderError(
                 "La solicitud a Gemini excedió "
                 "el tiempo de espera.",
-                kind=AIProviderErrorKind.TIMEOUT,
+                kind=(
+                    AIProviderErrorKind.TIMEOUT
+                ),
                 provider_name="gemini",
             ) from error
         except httpx.TransportError as error:
             raise AIProviderError(
                 "No fue posible conectar con "
                 "Gemini.",
-                kind=AIProviderErrorKind.NETWORK,
+                kind=(
+                    AIProviderErrorKind.NETWORK
+                ),
                 provider_name="gemini",
             ) from error
 
         function_call_response = (
-            self._extract_function_call(response)
+            self._extract_function_call(
+                response
+            )
         )
 
         if function_call_response is not None:
             return function_call_response
 
-        return self._extract_text_response(response)
+        return self._extract_text_response(
+            response
+        )
 
     def _build_config(
         self,
-    ) -> types.GenerateContentConfig | None:
-        gemini_tools = GeminiToolMapper.build_tools(
-            self._tool_metadata
+    ) -> (
+        types.GenerateContentConfig
+        | None
+    ):
+        gemini_tools = (
+            GeminiToolMapper.build_tools(
+                self._tool_metadata
+            )
         )
 
         if not gemini_tools:
@@ -170,6 +198,7 @@ class GeminiAIProvider:
             )
 
         function_call = calls[0]
+
         function_name = getattr(
             function_call,
             "name",
@@ -182,7 +211,10 @@ class GeminiAIProvider:
         )
 
         if (
-            not isinstance(function_name, str)
+            not isinstance(
+                function_name,
+                str,
+            )
             or not function_name.strip()
         ):
             raise AIProviderError(
@@ -206,7 +238,10 @@ class GeminiAIProvider:
                 function_arguments = dict(
                     function_arguments
                 )
-            except (TypeError, ValueError) as error:
+            except (
+                TypeError,
+                ValueError,
+            ) as error:
                 raise AIProviderError(
                     "Gemini devolvió argumentos "
                     "de herramienta inválidos.",
@@ -219,9 +254,91 @@ class GeminiAIProvider:
 
         return AIResponse.from_tool_call(
             ToolCall(
-                tool_name=function_name,
-                arguments=function_arguments,
+                tool_name=(
+                    function_name.strip()
+                ),
+                arguments=(
+                    function_arguments
+                ),
+            ),
+            provider_state=(
+                self._build_turn_state(
+                    response
+                )
+            ),
+        )
+
+    def _build_turn_state(
+        self,
+        response: object,
+    ) -> GeminiTurnState:
+        candidates = getattr(
+            response,
+            "candidates",
+            None,
+        )
+
+        if candidates is None:
+            raise AIProviderError(
+                "Gemini devolvió una llamada "
+                "a herramienta sin contenido.",
+                kind=(
+                    AIProviderErrorKind
+                    .INVALID_RESPONSE
+                ),
+                provider_name="gemini",
             )
+
+        try:
+            candidate_list = list(
+                candidates
+            )
+        except TypeError as error:
+            raise AIProviderError(
+                "Gemini devolvió candidatos "
+                "inválidos para continuar "
+                "el turno.",
+                kind=(
+                    AIProviderErrorKind
+                    .INVALID_RESPONSE
+                ),
+                provider_name="gemini",
+            ) from error
+
+        if not candidate_list:
+            raise AIProviderError(
+                "Gemini devolvió una llamada "
+                "a herramienta sin contenido.",
+                kind=(
+                    AIProviderErrorKind
+                    .INVALID_RESPONSE
+                ),
+                provider_name="gemini",
+            )
+
+        model_content = getattr(
+            candidate_list[0],
+            "content",
+            None,
+        )
+
+        if not isinstance(
+            model_content,
+            types.Content,
+        ):
+            raise AIProviderError(
+                "Gemini devolvió un contenido "
+                "inválido para continuar "
+                "el turno.",
+                kind=(
+                    AIProviderErrorKind
+                    .INVALID_RESPONSE
+                ),
+                provider_name="gemini",
+            )
+
+        return GeminiTurnState(
+            model_content=model_content,
         )
 
     def _extract_text_response(
@@ -234,7 +351,10 @@ class GeminiAIProvider:
             None,
         )
 
-        if not isinstance(response_text, str):
+        if not isinstance(
+            response_text,
+            str,
+        ):
             raise AIProviderError(
                 "Gemini devolvió una respuesta "
                 "sin texto ni llamada a una "
@@ -246,7 +366,9 @@ class GeminiAIProvider:
                 provider_name="gemini",
             )
 
-        cleaned_response = response_text.strip()
+        cleaned_response = (
+            response_text.strip()
+        )
 
         if not cleaned_response:
             raise AIProviderError(
@@ -272,14 +394,19 @@ class GeminiAIProvider:
 
         for message in context:
             role = message.get("role")
-            content = message.get("content")
+            content = message.get(
+                "content"
+            )
 
             if (
                 role not in {
                     "user",
                     "assistant",
                 }
-                or not isinstance(content, str)
+                or not isinstance(
+                    content,
+                    str,
+                )
                 or not content.strip()
             ):
                 raise AIProviderError(
@@ -303,7 +430,9 @@ class GeminiAIProvider:
                     role=gemini_role,
                     parts=[
                         types.Part.from_text(
-                            text=content.strip()
+                            text=(
+                                content.strip()
+                            )
                         )
                     ],
                 )
@@ -355,14 +484,18 @@ class GeminiAIProvider:
                 "enviada."
             )
         elif status_code == 408:
-            kind = AIProviderErrorKind.TIMEOUT
+            kind = (
+                AIProviderErrorKind.TIMEOUT
+            )
             message = (
                 "La solicitud a Gemini excedió "
                 "el tiempo de espera."
             )
         elif status_code == 429:
-            kind = self._classify_limit_error(
-                normalized_error_text
+            kind = (
+                self._classify_limit_error(
+                    normalized_error_text
+                )
             )
 
             if (
@@ -393,13 +526,17 @@ class GeminiAIProvider:
                 "disponible temporalmente."
             )
         elif status_code == 504:
-            kind = AIProviderErrorKind.TIMEOUT
+            kind = (
+                AIProviderErrorKind.TIMEOUT
+            )
             message = (
                 "Gemini no respondió dentro del "
                 "tiempo esperado."
             )
         else:
-            kind = AIProviderErrorKind.UNKNOWN
+            kind = (
+                AIProviderErrorKind.UNKNOWN
+            )
             message = (
                 "Gemini devolvió un error no "
                 "reconocido."
@@ -432,14 +569,18 @@ class GeminiAIProvider:
                 .QUOTA_EXHAUSTED
             )
 
-        return AIProviderErrorKind.RATE_LIMIT
+        return (
+            AIProviderErrorKind.RATE_LIMIT
+        )
 
     @staticmethod
     def _normalize_tools(
         tools: Iterable[ToolMetadata],
     ) -> tuple[ToolMetadata, ...]:
         try:
-            normalized_tools = tuple(tools)
+            normalized_tools = tuple(
+                tools
+            )
         except TypeError as error:
             raise TypeError(
                 "tools debe ser un iterable de "
@@ -453,7 +594,8 @@ class GeminiAIProvider:
             ):
                 raise TypeError(
                     "Cada herramienta debe ser "
-                    "una instancia de ToolMetadata."
+                    "una instancia de "
+                    "ToolMetadata."
                 )
 
         return normalized_tools

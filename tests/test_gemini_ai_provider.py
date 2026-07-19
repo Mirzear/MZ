@@ -1,7 +1,7 @@
 import unittest
 
 import httpx
-from google.genai import errors
+from google.genai import errors, types
 
 from app.ai.ai_provider_error import (
     AIProviderError,
@@ -14,10 +14,22 @@ from app.ai.ai_response import (
 from app.ai.gemini_ai_provider import (
     GeminiAIProvider,
 )
+from app.ai.gemini_turn_state import (
+    GeminiTurnState,
+)
+from app.tools.tool_call import ToolCall
 from app.tools.tool_metadata import (
     ToolMetadata,
     ToolRiskLevel,
 )
+
+
+class FakeCandidate:
+    def __init__(
+        self,
+        content: types.Content,
+    ) -> None:
+        self.content = content
 
 
 class FakeFunctionCall:
@@ -34,12 +46,13 @@ class FakeFunctionCall:
 class FakeGeminiResponse:
     def __init__(
         self,
-        text: object = None,
-        *,
+        text: str | None = None,
         function_calls: object = None,
+        candidates: object = None,
     ) -> None:
         self.text = text
         self.function_calls = function_calls
+        self.candidates = candidates
 
 
 class FakeModelsClient:
@@ -132,6 +145,36 @@ class TestGeminiAIProvider(
             requires_confirmation=False,
         )
 
+    def _create_tool_response(
+        self,
+        *,
+        name: str,
+        args: dict[str, object] | None,
+    ) -> FakeGeminiResponse:
+        model_content = types.Content(
+            role="model",
+            parts=[
+                types.Part.from_function_call(
+                    name=name,
+                    args=args or {},
+                )
+            ],
+        )
+
+        return FakeGeminiResponse(
+            function_calls=[
+                FakeFunctionCall(
+                    name=name,
+                    args=args,
+                )
+            ],
+            candidates=[
+                FakeCandidate(
+                    content=model_content,
+                )
+            ],
+        )
+
     def test_returns_structured_text_response(
         self,
     ) -> None:
@@ -182,15 +225,11 @@ class TestGeminiAIProvider(
         self,
     ) -> None:
         provider, _ = self._create_provider(
-            response=FakeGeminiResponse(
-                function_calls=[
-                    FakeFunctionCall(
-                        name="count_words",
-                        args={
-                            "text": "Hola mundo",
-                        },
-                    )
-                ]
+            response=self._create_tool_response(
+                name="count_words",
+                args={
+                    "text": "Hola mundo",
+                },
             )
         )
 
@@ -210,9 +249,7 @@ class TestGeminiAIProvider(
             "count_words",
         )
         self.assertEqual(
-            dict(
-                response.tool_call.arguments
-            ),
+            response.tool_call.arguments,
             {
                 "text": "Hola mundo",
             },
@@ -222,15 +259,9 @@ class TestGeminiAIProvider(
         self,
     ) -> None:
         provider, _ = self._create_provider(
-            response=FakeGeminiResponse(
-                function_calls=[
-                    FakeFunctionCall(
-                        name=(
-                            "get_current_datetime"
-                        ),
-                        args=None,
-                    )
-                ]
+            response=self._create_tool_response(
+                name="get_current_datetime",
+                args=None,
             )
         )
 
@@ -239,11 +270,48 @@ class TestGeminiAIProvider(
             context=[],
         )
 
+        self.assertTrue(
+            response.is_tool_call
+        )
+        self.assertIsNotNone(
+            response.tool_call
+        )
         self.assertEqual(
-            dict(
-                response.tool_call.arguments
-            ),
+            response.tool_call.tool_name,
+            "get_current_datetime",
+        )
+        self.assertEqual(
+            response.tool_call.arguments,
             {},
+        )
+
+    def test_tool_call_contains_turn_state(
+        self,
+    ) -> None:
+        provider, _ = self._create_provider(
+            response=self._create_tool_response(
+                name="count_words",
+                args={
+                    "text": "Hola mundo",
+                },
+            )
+        )
+
+        response = provider.generate_response(
+            prompt="Contá las palabras",
+            context=[],
+        )
+
+        self.assertTrue(
+            response.is_tool_call
+        )
+        self.assertIsInstance(
+            response.provider_state,
+            GeminiTurnState,
+        )
+        self.assertIsInstance(
+            response.provider_state.model_content,
+            types.Content,
         )
 
     def test_rejects_multiple_tool_calls(

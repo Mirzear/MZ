@@ -22,6 +22,10 @@ from app.tools.tool_metadata import (
     ToolMetadata,
     ToolRiskLevel,
 )
+from app.tools.tool_execution_result import (
+    ToolExecutionResult,
+    ToolExecutionStatus,
+)
 
 
 class FakeCandidate:
@@ -845,6 +849,314 @@ class TestGeminiAIProvider(
                 api_key="test-api-key",
                 model=" ",
             )
+
+    def test_continues_from_successful_tool_result(
+        self,
+    ) -> None:
+        initial_tool_response = (
+            self._create_tool_response(
+                name="count_words",
+                args={
+                    "text": "Hola mundo",
+                },
+            )
+        )
+
+        provider, models = self._create_provider(
+            response=initial_tool_response,
+        )
+
+        previous_response = (
+            provider.generate_response(
+                prompt="Contá las palabras",
+                context=[],
+            )
+        )
+
+        models.response = FakeGeminiResponse(
+            text="El texto tiene 2 palabras."
+        )
+
+        response = (
+            provider.continue_from_tool_result(
+                previous_response=(
+                    previous_response
+                ),
+                tool_result=ToolExecutionResult(
+                    tool_name="count_words",
+                    status=(
+                        ToolExecutionStatus.SUCCESS
+                    ),
+                    output=2,
+                    call_id=(
+                        previous_response
+                        .tool_call
+                        .call_id
+                    ),
+                ),
+            )
+        )
+
+        self.assertTrue(response.is_text)
+        self.assertEqual(
+            response.content,
+            "El texto tiene 2 palabras.",
+        )
+        self.assertEqual(models.calls, 2)
+
+        contents = models.last_contents
+
+        self.assertIsNotNone(contents)
+        self.assertEqual(len(contents), 3)
+        self.assertEqual(
+            contents[0].role,
+            "user",
+        )
+        self.assertEqual(
+            contents[1].role,
+            "model",
+        )
+        self.assertEqual(
+            contents[2].role,
+            "tool",
+        )
+
+        function_response = (
+            contents[2]
+            .parts[0]
+            .function_response
+        )
+
+        self.assertEqual(
+            function_response.name,
+            "count_words",
+        )
+        self.assertEqual(
+            function_response.response,
+            {
+                "result": 2,
+            },
+        )
+
+    def test_sends_tool_error_to_gemini(
+        self,
+        ) -> None:
+        provider, models = self._create_provider(
+        response=self._create_tool_response(
+            name="count_words",
+            args={
+                "text": "Hola mundo",
+            },
+        )
+        )
+
+        previous_response = (
+        provider.generate_response(
+            prompt="Contá las palabras",
+            context=[],
+        )
+        )
+
+        models.response = FakeGeminiResponse(
+        text="No pude contar las palabras."
+        )
+
+        provider.continue_from_tool_result(
+        previous_response=previous_response,
+        tool_result=ToolExecutionResult(
+            tool_name="count_words",
+            status=(
+                ToolExecutionStatus.ERROR
+            ),
+            error_message=(
+                "La herramienta falló."
+            ),
+            call_id=(
+                previous_response
+                .tool_call
+                .call_id
+            ),
+        ),
+        )
+
+        contents = models.last_contents
+
+        self.assertIsNotNone(contents)
+
+        function_response = (
+        contents[-1]
+        .parts[0]
+        .function_response
+        )
+
+        self.assertEqual(
+        function_response.response,
+        {
+            "status": "error",
+            "error": (
+                "La herramienta falló."
+            ),
+        },
+        )
+
+    def test_rejects_continuation_without_gemini_state(
+        self,
+    ) -> None:
+        provider, _ = self._create_provider(
+            response=FakeGeminiResponse(
+                text="Respuesta"
+            )
+        )
+
+        previous_response = (
+            AIResponse.from_tool_call(
+                ToolCall(
+                    tool_name="count_words",
+                    arguments={
+                        "text": "Hola mundo",
+                    },
+                )
+            )
+        )
+
+        with self.assertRaises(
+            AIProviderError
+        ) as context:
+            provider.continue_from_tool_result(
+                previous_response=(
+                    previous_response
+                ),
+                tool_result=ToolExecutionResult(
+                    tool_name="count_words",
+                    status=(
+                        ToolExecutionStatus.SUCCESS
+                    ),
+                    output=2,
+                    call_id=(
+                        previous_response
+                        .tool_call
+                        .call_id
+                    ),
+                ),
+            )
+
+        self.assertEqual(
+            context.exception.kind,
+            (
+                AIProviderErrorKind
+                .INVALID_REQUEST
+            ),
+        )
+    
+    def test_rejects_result_for_different_tool(
+        self,
+    ) -> None:
+        provider, _ = self._create_provider(
+            response=self._create_tool_response(
+                name="count_words",
+                args={
+                    "text": "Hola mundo",
+                },
+            )
+        )
+
+        previous_response = (
+            provider.generate_response(
+                prompt="Contá las palabras",
+                context=[],
+            )
+        )
+
+        with self.assertRaises(
+            AIProviderError
+        ) as context:
+            provider.continue_from_tool_result(
+                previous_response=(
+                    previous_response
+                ),
+                tool_result=ToolExecutionResult(
+                    tool_name=(
+                        "get_current_datetime"
+                    ),
+                    status=(
+                        ToolExecutionStatus.SUCCESS
+                    ),
+                    output="12:00",
+                    call_id=(
+                        previous_response
+                        .tool_call
+                        .call_id
+                    ),
+                ),
+            )
+
+        self.assertEqual(
+            context.exception.kind,
+            (
+                AIProviderErrorKind
+                .INVALID_REQUEST
+            ),
+        )
+
+    def test_continuation_can_return_another_tool_call(
+        self,
+    ) -> None:
+        provider, models = self._create_provider(
+            response=self._create_tool_response(
+                name="count_words",
+                args={
+                    "text": "Hola mundo",
+                },
+            )
+        )
+
+        previous_response = (
+            provider.generate_response(
+                prompt="Contá las palabras",
+                context=[],
+            )
+        )
+
+        models.response = (
+            self._create_tool_response(
+                name="get_current_datetime",
+                args={},
+            )
+        )
+
+        response = (
+            provider.continue_from_tool_result(
+                previous_response=(
+                    previous_response
+                ),
+                tool_result=ToolExecutionResult(
+                    tool_name="count_words",
+                    status=(
+                        ToolExecutionStatus.SUCCESS
+                    ),
+                    output=2,
+                    call_id=(
+                        previous_response
+                        .tool_call
+                        .call_id
+                    ),
+                ),
+            )
+        )
+
+        self.assertTrue(response.is_tool_call)
+        self.assertEqual(
+            response.tool_call.tool_name,
+            "get_current_datetime",
+        )
+        self.assertIsInstance(
+            response.provider_state,
+            GeminiTurnState,
+        )
+        self.assertEqual(
+            response.provider_state.contents,
+            tuple(models.last_contents),
+        )
 
 
 if __name__ == "__main__":

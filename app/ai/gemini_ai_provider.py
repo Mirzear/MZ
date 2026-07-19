@@ -18,6 +18,9 @@ from app.ai.gemini_turn_state import (
 )
 from app.tools.tool_call import ToolCall
 from app.tools.tool_metadata import ToolMetadata
+from app.tools.tool_execution_result import (
+    ToolExecutionResult,
+)
 
 
 class GeminiModelsClient(Protocol):
@@ -39,7 +42,7 @@ class GeminiClient(Protocol):
 
 
 class GeminiAIProvider:
-    
+
     def __init__(
         self,
         api_key: str,
@@ -90,10 +93,137 @@ class GeminiAIProvider:
             prompt=prompt,
             context=context,
         )
+
+        response = self._generate_content(
+            contents=contents,
+        )
+
+        return self._extract_response(
+            response=response,
+            contents=contents,
+        )
+    
+    def continue_from_tool_result(
+        self,
+        *,
+        previous_response: AIResponse,
+        tool_result: ToolExecutionResult,
+    ) -> AIResponse:
+        if not isinstance(
+            previous_response,
+            AIResponse,
+        ):
+            raise TypeError(
+                "previous_response debe ser una "
+                "instancia de AIResponse."
+            )
+
+        if not isinstance(
+            tool_result,
+            ToolExecutionResult,
+        ):
+            raise TypeError(
+                "tool_result debe ser una instancia "
+                "de ToolExecutionResult."
+            )
+
+        if (
+            not previous_response.is_tool_call
+            or previous_response.tool_call is None
+        ):
+            raise AIProviderError(
+                "Gemini solo puede continuar desde "
+                "una respuesta de herramienta.",
+                kind=(
+                    AIProviderErrorKind
+                    .INVALID_REQUEST
+                ),
+                provider_name="gemini",
+            )
+
+        turn_state = (
+            previous_response.provider_state
+        )
+
+        if not isinstance(
+            turn_state,
+            GeminiTurnState,
+        ):
+            raise AIProviderError(
+                "La respuesta anterior no contiene "
+                "un estado válido de Gemini.",
+                kind=(
+                    AIProviderErrorKind
+                    .INVALID_REQUEST
+                ),
+                provider_name="gemini",
+            )
+
+        previous_tool_call = (
+            previous_response.tool_call
+        )
+
+        if (
+            previous_tool_call.tool_name
+            != tool_result.tool_name
+        ):
+            raise AIProviderError(
+                "El resultado recibido no pertenece "
+                "a la herramienta solicitada por "
+                "Gemini.",
+                kind=(
+                    AIProviderErrorKind
+                    .INVALID_REQUEST
+                ),
+                provider_name="gemini",
+            )
+
+        if (
+            tool_result.call_id is not None
+            and tool_result.call_id
+            != previous_tool_call.call_id
+        ):
+            raise AIProviderError(
+                "El resultado recibido no pertenece "
+                "a la llamada de herramienta "
+                "solicitada por Gemini.",
+                kind=(
+                    AIProviderErrorKind
+                    .INVALID_REQUEST
+                ),
+                provider_name="gemini",
+            )
+
+        function_response_content = (
+            self._build_function_response_content(
+                tool_result
+            )
+        )
+
+        contents = [
+            *turn_state.contents,
+            turn_state.model_content,
+            function_response_content,
+        ]
+
+        response = self._generate_content(
+            contents=contents,
+        )
+
+        return self._extract_response(
+            response=response,
+            contents=contents,
+        )
+
+    def _generate_content(
+        self,
+        *,
+        contents: list[types.Content],
+    ) -> object:
         config = self._build_config()
 
         try:
-            response = (
+            return (
                 self._client.models
                 .generate_content(
                     model=self._model,
@@ -124,6 +254,12 @@ class GeminiAIProvider:
                 provider_name="gemini",
             ) from error
 
+    def _extract_response(
+        self,
+        *,
+        response: object,
+        contents: list[types.Content],
+    ) -> AIResponse:
         function_call_response = (
             self._extract_function_call(
                 response=response,
@@ -556,6 +692,34 @@ class GeminiAIProvider:
             message,
             kind=kind,
             provider_name="gemini",
+        )
+
+    @staticmethod
+    def _build_function_response_content(
+        tool_result: ToolExecutionResult,
+    ) -> types.Content:
+        if tool_result.succeeded:
+            response_payload = {
+                "result": tool_result.output,
+            }
+        else:
+            response_payload = {
+                "status": tool_result.status.value,
+                "error": tool_result.error_message,
+            }
+
+        function_response_part = (
+            types.Part.from_function_response(
+                name=tool_result.tool_name,
+                response=response_payload,
+            )
+        )
+
+        return types.Content(
+            role="tool",
+            parts=[
+                function_response_part,
+            ],
         )
 
     @staticmethod

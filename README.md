@@ -12,4 +12,4 @@ MZ es un asistente de inteligencia artificial personal desarrollado en Python.
 - Integración con Android
 - Asistente personal
 
-Versión actual: v2.5.1
+Versión actual: v2.6.0

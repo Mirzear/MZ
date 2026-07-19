@@ -23,7 +23,6 @@ from app.tools.tool_registry import ToolRegistry
 
 
 class MZ:
-
     def __init__(self) -> None:
         self.config = ConfigManager()
         self.session = SessionManager()
@@ -31,25 +30,10 @@ class MZ:
         self.memory = MemoryManager()
         self.system = SystemManager()
 
-        self.ai_provider_factory = (
-            AIProviderFactory(
-                config=self.config,
-            )
-        )
-
-        self.ai = AIService(
-            provider=(
-                self.ai_provider_factory
-                .create()
-            )
-        )
-
         self.tool_registry = ToolRegistry()
-
         self.tool_loader = ToolLoader(
             registry=self.tool_registry,
         )
-
         self.core_tools = CoreTools()
 
         self.tool_loader.load(
@@ -58,6 +42,22 @@ class MZ:
 
         self.tool_executor = ToolExecutor(
             registry=self.tool_registry,
+        )
+
+        self.ai_provider_factory = (
+            AIProviderFactory(
+                config=self.config,
+                tools=(
+                    self.tool_registry
+                    .get_all_metadata()
+                ),
+            )
+        )
+
+        self.ai = AIService(
+            provider=(
+                self.ai_provider_factory.create()
+            )
         )
 
         self.command_registry = CommandRegistry()
@@ -83,14 +83,11 @@ class MZ:
             "user",
             "Usuario",
         )
-
         self.running = False
 
     def start(self) -> None:
         self.running = True
-
         self.logger.info("MZ started")
-
         self.show_startup_message()
         self.run_conversation_loop()
 
@@ -98,7 +95,6 @@ class MZ:
         print("=" * 50)
         print(f"{self.name} v{self.version}")
         print("=" * 50)
-
         print("Inicializando sistema...")
         print("[✔] Núcleo cargado")
         print("[✔] Configuración cargada")
@@ -126,7 +122,6 @@ class MZ:
             "[✔] Ejecutor de herramientas "
             "cargado"
         )
-
         print()
         print(f"Hola {self.user}.")
         print(f"{self.name} está operativo.")

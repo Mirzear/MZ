@@ -124,6 +124,25 @@ class TestMZToolIntegration(
             result.output,
             4,
         )
+    
+    def test_ai_factory_receives_registered_tools(
+        self,
+    ) -> None:
+        registered_metadata = (
+            self.mz.tool_registry
+            .get_all_metadata()
+        )
+
+        self.assertEqual(
+            self.mz.ai_provider_factory.tools,
+            registered_metadata,
+        )
+        self.assertEqual(
+            len(
+                self.mz.ai_provider_factory.tools
+            ),
+            2,
+        )
 
 
 if __name__ == "__main__":

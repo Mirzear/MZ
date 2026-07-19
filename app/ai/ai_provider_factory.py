@@ -1,5 +1,5 @@
 import os
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from dotenv import load_dotenv
@@ -18,14 +18,15 @@ from app.ai.provider_candidate import (
     ProviderCandidate,
 )
 from app.core.config_manager import ConfigManager
+from app.tools.tool_metadata import ToolMetadata
 
 
 class AIProviderFactory:
-
     def __init__(
         self,
         config: ConfigManager,
         *,
+        tools: Iterable[ToolMetadata] = (),
         environ: Mapping[str, str] | None = None,
     ) -> None:
         if not isinstance(
@@ -38,6 +39,7 @@ class AIProviderFactory:
             )
 
         self._config = config
+        self._tools = self._normalize_tools(tools)
 
         if environ is None:
             load_dotenv(
@@ -47,7 +49,6 @@ class AIProviderFactory:
                 ),
                 override=False,
             )
-
             self._environ: Mapping[
                 str,
                 str,
@@ -55,10 +56,12 @@ class AIProviderFactory:
         else:
             self._environ = environ
 
+    @property
+    def tools(self) -> tuple[ToolMetadata, ...]:
+        return self._tools
+
     def create(self) -> AIProvider:
-        candidates = (
-            self._create_candidates()
-        )
+        candidates = self._create_candidates()
 
         if not candidates:
             return MockAIProvider()
@@ -73,15 +76,10 @@ class AIProviderFactory:
     def _create_candidates(
         self,
     ) -> list[ProviderCandidate]:
-        ai_config = (
-            self._config.get_section("ai")
-        )
-
-        configured_providers = (
-            ai_config.get(
-                "providers",
-                [],
-            )
+        ai_config = self._config.get_section("ai")
+        configured_providers = ai_config.get(
+            "providers",
+            [],
         )
 
         if not isinstance(
@@ -97,10 +95,8 @@ class AIProviderFactory:
         for provider_config in (
             configured_providers
         ):
-            candidate = (
-                self._create_candidate(
-                    provider_config
-                )
+            candidate = self._create_candidate(
+                provider_config
             )
 
             if candidate is not None:
@@ -118,10 +114,7 @@ class AIProviderFactory:
         ):
             return None
 
-        name = provider_config.get(
-            "name"
-        )
-
+        name = provider_config.get("name")
         enabled = provider_config.get(
             "enabled",
             True,
@@ -139,10 +132,8 @@ class AIProviderFactory:
         )
 
         if normalized_name == "gemini":
-            return (
-                self._create_gemini_candidate(
-                    provider_config
-                )
+            return self._create_gemini_candidate(
+                provider_config
             )
 
         if normalized_name == "mock":
@@ -178,6 +169,7 @@ class AIProviderFactory:
         provider = GeminiAIProvider(
             api_key=api_key,
             model=normalized_model,
+            tools=self._tools,
         )
 
         return ProviderCandidate(
@@ -203,3 +195,27 @@ class AIProviderFactory:
                 return value.strip()
 
         return None
+
+    @staticmethod
+    def _normalize_tools(
+        tools: Iterable[ToolMetadata],
+    ) -> tuple[ToolMetadata, ...]:
+        try:
+            normalized_tools = tuple(tools)
+        except TypeError as error:
+            raise TypeError(
+                "tools debe ser un iterable de "
+                "ToolMetadata."
+            ) from error
+
+        for metadata in normalized_tools:
+            if not isinstance(
+                metadata,
+                ToolMetadata,
+            ):
+                raise TypeError(
+                    "Cada herramienta debe ser "
+                    "una instancia de ToolMetadata."
+                )
+
+        return normalized_tools

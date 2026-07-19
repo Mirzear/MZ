@@ -19,12 +19,15 @@ from app.ai.mock_ai_provider import (
 from app.core.config_manager import (
     ConfigManager,
 )
+from app.tools.tool_metadata import (
+    ToolMetadata,
+    ToolRiskLevel,
+)
 
 
 class TestAIProviderFactory(
     unittest.TestCase
 ):
-
     def _create_config(
         self,
         providers: object,
@@ -35,7 +38,6 @@ class TestAIProviderFactory(
         temporary_directory = (
             tempfile.TemporaryDirectory()
         )
-
         config_path = (
             Path(temporary_directory.name)
             / "config.json"
@@ -63,6 +65,27 @@ class TestAIProviderFactory(
             manager,
         )
 
+    @staticmethod
+    def _create_tool_metadata(
+    ) -> ToolMetadata:
+        return ToolMetadata(
+            name="count_words",
+            description=(
+                "Cuenta las palabras de un texto."
+            ),
+            parameters={
+                "text": {
+                    "type": "string",
+                    "description": (
+                        "Texto que será analizado."
+                    ),
+                    "required": True,
+                }
+            },
+            risk_level=ToolRiskLevel.LOW,
+            requires_confirmation=False,
+        )
+
     def test_creates_mock_provider(
         self,
     ) -> None:
@@ -76,7 +99,6 @@ class TestAIProviderFactory(
                 ]
             )
         )
-
         self.addCleanup(
             temporary_directory.cleanup
         )
@@ -113,7 +135,6 @@ class TestAIProviderFactory(
                 ]
             )
         )
-
         self.addCleanup(
             temporary_directory.cleanup
         )
@@ -150,7 +171,6 @@ class TestAIProviderFactory(
                 ]
             )
         )
-
         self.addCleanup(
             temporary_directory.cleanup
         )
@@ -170,7 +190,6 @@ class TestAIProviderFactory(
             provider,
             FallbackAIProvider,
         )
-
         self.assertEqual(
             provider
             .get_available_provider_names(),
@@ -194,7 +213,6 @@ class TestAIProviderFactory(
                 ]
             )
         )
-
         self.addCleanup(
             temporary_directory.cleanup
         )
@@ -212,10 +230,8 @@ class TestAIProviderFactory(
         )
 
         with patch(
-            (
-                "app.ai.ai_provider_factory"
-                ".GeminiAIProvider"
-            )
+            "app.ai.ai_provider_factory"
+            ".GeminiAIProvider"
         ) as provider_class:
             provider_class.return_value = (
                 MockAIProvider()
@@ -223,10 +239,115 @@ class TestAIProviderFactory(
 
             factory.create()
 
-        provider_class.assert_called_once_with(
-            api_key="google-key",
-            model="test-model",
+            provider_class.assert_called_once_with(
+                api_key="google-key",
+                model="test-model",
+                tools=(),
+            )
+
+    def test_passes_tools_to_gemini_provider(
+        self,
+    ) -> None:
+        temporary_directory, config = (
+            self._create_config(
+                [
+                    {
+                        "name": "gemini",
+                        "enabled": True,
+                        "model": "test-model",
+                    }
+                ]
+            )
         )
+        self.addCleanup(
+            temporary_directory.cleanup
+        )
+
+        metadata = (
+            self._create_tool_metadata()
+        )
+
+        factory = AIProviderFactory(
+            config=config,
+            tools=(metadata,),
+            environ={
+                "GEMINI_API_KEY": (
+                    "test-api-key"
+                ),
+            },
+        )
+
+        provider = factory.create()
+
+        self.assertIsInstance(
+            provider,
+            GeminiAIProvider,
+        )
+        self.assertEqual(
+            provider.tools,
+            (metadata,),
+        )
+
+    def test_tools_property_returns_metadata(
+        self,
+    ) -> None:
+        temporary_directory, config = (
+            self._create_config([])
+        )
+        self.addCleanup(
+            temporary_directory.cleanup
+        )
+
+        metadata = (
+            self._create_tool_metadata()
+        )
+
+        factory = AIProviderFactory(
+            config=config,
+            tools=(metadata,),
+            environ={},
+        )
+
+        self.assertEqual(
+            factory.tools,
+            (metadata,),
+        )
+
+    def test_rejects_invalid_tools(
+        self,
+    ) -> None:
+        temporary_directory, config = (
+            self._create_config([])
+        )
+        self.addCleanup(
+            temporary_directory.cleanup
+        )
+
+        with self.assertRaises(TypeError):
+            AIProviderFactory(
+                config=config,
+                tools=(
+                    object(),  # type: ignore[arg-type]
+                ),
+                environ={},
+            )
+
+    def test_rejects_non_iterable_tools(
+        self,
+    ) -> None:
+        temporary_directory, config = (
+            self._create_config([])
+        )
+        self.addCleanup(
+            temporary_directory.cleanup
+        )
+
+        with self.assertRaises(TypeError):
+            AIProviderFactory(
+                config=config,
+                tools=object(),  # type: ignore[arg-type]
+                environ={},
+            )
 
     def test_disabled_provider_is_skipped(
         self,
@@ -248,7 +369,6 @@ class TestAIProviderFactory(
                 ]
             )
         )
-
         self.addCleanup(
             temporary_directory.cleanup
         )
@@ -286,7 +406,6 @@ class TestAIProviderFactory(
                 ]
             )
         )
-
         self.addCleanup(
             temporary_directory.cleanup
         )
@@ -309,7 +428,6 @@ class TestAIProviderFactory(
         temporary_directory, config = (
             self._create_config([])
         )
-
         self.addCleanup(
             temporary_directory.cleanup
         )
@@ -342,7 +460,6 @@ class TestAIProviderFactory(
                 ]
             )
         )
-
         self.addCleanup(
             temporary_directory.cleanup
         )
